@@ -17,7 +17,7 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 ## Phase 1 — Hero Shell & Empty State
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 2 — App shell with empty Surprise hero** | Stand up routing, theme toggle, and hero layout using static placeholder data. | Running app shows header, theme toggle switching visual state, and hero empty state per wireframe. Navigation stubs exist for Add and Details routes. | Step 1 |
+| **Step 2 — App shell with empty Surprise hero** | Theme toggle and hero layout using static placeholder data. | Running app shows header, theme toggle switching visual state, and hero empty state per wireframe. | Step 1 |
 
 ## Phase 2 — Manual Mnemon Vertical Slice
 | Step | Goal | Reviewable Outcome | Dependencies |

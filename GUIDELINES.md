@@ -9,3 +9,5 @@ These are the md files that you should read:
 - LIVING_PLAN.md this defines all the phases of the project
 - PROJECT.md this explains what the project is supposed to do
 - WIREFRAMES.md this explains what the project is supposed to look like
+
+If you are implementing a design feature, follow the guidelines in the WIREFRAMES.md file.
