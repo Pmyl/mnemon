@@ -1,0 +1,11 @@
+Some general information for the agent
+
+- If you are failing to do a task stop, don't try to go around the problem. For example if the tests are failing do not remove the tests.
+
+
+These are the md files that you should read:
+
+- AGENTS.md If you have to do anything with dioxus
+- LIVING_PLAN.md this defines all the phases of the project
+- PROJECT.md this explains what the project is supposed to do
+- WIREFRAMES.md this explains what the project is supposed to look like

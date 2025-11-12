@@ -12,7 +12,7 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 ## Phase 0 — Project Bootstrap
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 1 — Scaffold the workspace** | Create the multi-crate Rust workspace and baseline Dioxus entry points. | `cargo` workspace with platform targets builds and runs a “Hello Mnemon” screen via `dx` for web and desktop. | None |
+| **Step 1 — Scaffold the workspace** | Create the  Dioxus entry points. | application that runs "Hello mnemon" screen | None |
 
 ## Phase 1 — Hero Shell & Empty State
 | Step | Goal | Reviewable Outcome | Dependencies |
