@@ -115,23 +115,11 @@ fn get_sample_mnemons() -> Vec<Mnemon> {
 
 #[component]
 fn App() -> Element {
-    // Theme state: true = dark, false = light
-    let mut theme = use_signal(|| true);
-
     // All mnemons
     let mnemons = use_signal(|| get_sample_mnemons());
 
     // Current mnemon index
     let mut current_index = use_signal(|| 0);
-
-    // Apply dark mode class to document element whenever theme changes
-    use_effect(move || {
-        if theme() {
-            eval("document.documentElement.classList.add('dark');");
-        } else {
-            eval("document.documentElement.classList.remove('dark');");
-        }
-    });
 
     let current_mnemon = use_memo(move || {
         let all = mnemons();
@@ -145,10 +133,7 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
 
         div {
-            class: "min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors",
-
-            // Header
-            Header { theme }
+            class: "h-screen w-screen overflow-hidden bg-gray-900",
 
             // Hero with current mnemon
             if let Some(mnemon) = current_mnemon() {
@@ -165,59 +150,15 @@ fn App() -> Element {
 }
 
 #[component]
-fn Header(mut theme: Signal<bool>) -> Element {
-    rsx! {
-        header {
-            class: "fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800",
-            div {
-                class: "container mx-auto px-4 py-4 flex items-center justify-between",
-
-                // Logo
-                div {
-                    class: "text-2xl font-bold text-gray-900 dark:text-gray-100",
-                    "Mnemon"
-                }
-
-                div {
-                    class: "flex items-center gap-4",
-
-                    // Add button
-                    button {
-                        class: "px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium",
-                        "＋ Add"
-                    }
-
-                    // Theme Toggle
-                    button {
-                        class: "p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
-                        onclick: move |_| {
-                            theme.set(!theme());
-                        },
-                        span {
-                            class: "text-2xl",
-                            if theme() {
-                                "🌙"
-                            } else {
-                                "☀️"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[component]
 fn Hero(mnemon: Mnemon, on_next: EventHandler<()>) -> Element {
     rsx! {
         div {
-            class: "relative min-h-screen w-full",
+            class: "relative h-full w-full",
 
             // Background cover image with overlay
             div {
                 class: "absolute inset-0 z-0",
-                style: "background-image: url('{mnemon.cover_url}'); background-size: cover; background-position: center;",
+                style: "background-image: url('{mnemon.cover_url}'); background-size: cover; background-position: center; background-repeat: no-repeat;",
 
                 // Dark overlay for readability
                 div {
@@ -225,78 +166,41 @@ fn Hero(mnemon: Mnemon, on_next: EventHandler<()>) -> Element {
                 }
             }
 
-            // Content overlay
+            // Content overlay - footnote style at bottom right
             div {
-                class: "relative z-10 container mx-auto px-6 pt-32 pb-16 flex items-center min-h-screen",
+                class: "relative z-10 px-8 pb-8 flex items-end justify-end h-full",
 
                 div {
-                    class: "max-w-3xl",
+                    class: "max-w-md",
 
-                    // Type and Year
+                    // Icon and Title
                     div {
-                        class: "flex items-center gap-2 mb-4 text-gray-200",
+                        class: "flex items-center gap-3 mb-3",
                         span {
-                            class: "text-2xl",
+                            class: "text-2xl opacity-90",
                             "{mnemon.work_type.icon()}"
                         }
-                        span {
-                            class: "text-lg font-medium",
-                            "{mnemon.year} • {mnemon.work_type.label()}"
+                        h1 {
+                            class: "text-2xl font-semibold text-white/95",
+                            "{mnemon.title}"
                         }
-                    }
-
-                    // Title
-                    h1 {
-                        class: "text-5xl md:text-6xl font-bold mb-6 text-white leading-tight",
-                        "{mnemon.title}"
                     }
 
                     // Feelings
                     if !mnemon.feelings.is_empty() {
                         div {
-                            class: "flex flex-wrap gap-2 mb-6",
+                            class: "flex flex-wrap gap-2",
                             for feeling in mnemon.feelings.iter() {
                                 span {
-                                    class: "px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-sm rounded-full border border-white/30",
+                                    class: "px-3 py-1 bg-white/15 backdrop-blur-sm text-white/90 text-sm rounded-full border border-white/20",
                                     "{feeling}"
                                 }
                             }
                         }
                     }
 
-                    // Finished date
-                    if let Some(date) = &mnemon.finished_date {
-                        div {
-                            class: "text-gray-300 mb-4",
-                            "Finished on: {date}"
-                        }
-                    }
 
-                    // Notes preview
-                    if let Some(notes) = &mnemon.notes {
-                        div {
-                            class: "text-gray-200 text-lg mb-8 leading-relaxed line-clamp-3",
-                            style: "display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;",
-                            "{notes}"
-                        }
-                    }
 
-                    // Action buttons
-                    div {
-                        class: "flex flex-wrap gap-4",
-
-                        button {
-                            class: "px-6 py-3 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white rounded-lg transition-all font-medium border border-white/30 flex items-center gap-2",
-                            onclick: move |_| on_next.call(()),
-                            span { "🔀" }
-                            "Next Surprise"
-                        }
-
-                        button {
-                            class: "px-6 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-lg transition-colors font-medium",
-                            "Open Memory"
-                        }
-                    }
                 }
             }
         }
