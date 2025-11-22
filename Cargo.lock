@@ -4779,6 +4779,9 @@ name = "temp"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "getrandom 0.2.16",
+ "gloo-timers",
+ "rand 0.8.5",
 ]
 
 [[package]]
