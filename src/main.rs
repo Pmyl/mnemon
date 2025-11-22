@@ -241,21 +241,22 @@ fn calculate_reading_time(text: &str) -> u64 {
 }
 
 #[component]
-fn Hero(mnemon: Mnemon, is_transitioning: bool) -> Element {
+fn Hero(mnemon: ReadSignal<Mnemon>, is_transitioning: bool) -> Element {
     use rand::seq::SliceRandom;
     use rand::thread_rng;
-
-    // Pick up to 2 random notes (only once when component mounts)
-    let selected_notes = use_signal(|| {
-        let mut rng = thread_rng();
-        let mut notes = mnemon.notes.clone();
-        notes.shuffle(&mut rng);
-        notes.into_iter().take(2).collect::<Vec<_>>()
-    });
 
     // Current note index
     let mut current_note_index = use_signal(|| 0);
     let mut note_visible = use_signal(|| true);
+
+    // Selected notes - updates when mnemon changes
+    let selected_notes = use_memo(move || {
+        let mut rng = thread_rng();
+        let mut notes = mnemon().notes.clone();
+        notes.shuffle(&mut rng);
+        current_note_index.set(0);
+        notes.into_iter().take(2).collect::<Vec<String>>()
+    });
 
     // Rotate through notes with fade animation
     use_effect(move || {
@@ -305,7 +306,7 @@ fn Hero(mnemon: Mnemon, is_transitioning: bool) -> Element {
             // Background cover image with overlay
             div {
                 class: "absolute inset-0 z-0",
-                style: "background-image: url('{mnemon.cover_url}'); background-size: cover; background-position: center; background-repeat: no-repeat;",
+                style: "background-image: url('{mnemon().cover_url}'); background-size: cover; background-position: center; background-repeat: no-repeat;",
 
                 // Dark overlay for readability
                 div {
@@ -313,10 +314,10 @@ fn Hero(mnemon: Mnemon, is_transitioning: bool) -> Element {
                 }
             }
 
-            // Note display - center left
+            // Note display - lower left
             if let Some(note) = current_note() {
                 div {
-                    class: "absolute left-8 top-1/2 -translate-y-1/2 z-10 max-w-lg transition-opacity duration-500",
+                    class: "absolute left-4 top-2/3 z-10 max-w-lg-1 max-w-80 transition-opacity duration-500",
                     style: if note_visible() { "opacity: 1;" } else { "opacity: 0;" },
 
                     p {
@@ -338,19 +339,19 @@ fn Hero(mnemon: Mnemon, is_transitioning: bool) -> Element {
                         class: "flex items-center gap-3 mb-3",
                         span {
                             class: "text-2xl opacity-90",
-                            "{mnemon.work_type.icon()}"
+                            "{mnemon().work_type.icon()}"
                         }
                         h1 {
                             class: "text-2xl font-semibold text-white/95",
-                            "{mnemon.title}"
+                            "{mnemon().title}"
                         }
                     }
 
                     // Feelings
-                    if !mnemon.feelings.is_empty() {
+                    if !mnemon().feelings.is_empty() {
                         div {
                             class: "flex flex-wrap gap-2",
-                            for feeling in mnemon.feelings.iter() {
+                            for feeling in mnemon().feelings.iter() {
                                 span {
                                     class: "px-3 py-1 bg-white/15 backdrop-blur-sm text-white/90 text-sm rounded-full border border-white/20",
                                     "{feeling}"
