@@ -24,27 +24,27 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 | --- | --- | --- | --- |
 | **Step 3 — Manual Add flow creates surfacing mnemons** ✅ | Implement Step 1 (manual-only entry), Step 2 personalization, and in-memory storage used by the hero. | You can add a manual mnemon, return to hero, and see it surfaced (with feelings/notes preview). Auto-cycle continues through all session mnemons. | Step 2 |
 
-## Phase 3 — Read-only Details & Audio Stub
+## Phase 3 — Provider Search Experience
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 4 — Memory Details view with audio controls (stub)** | Render Details route, share components for feelings/notes, and wire a stubbed audio controller. | Selecting “Open Memory” shows read-only detail screen with placeholder cover/audio player that reacts to play/stop in UI (no actual audio yet). | Step 3 |
+| **Step 4 — Provider search with deterministic fixtures** ✅ | Introduce provider abstractions plus fixture-backed results hooked into Step 1 UI. | Searching shows grouped provider results with exact-ID dedupe; selecting a fixture Work populates hero/details using cached metadata. | Step 3 |
+| **Step 5 — Real provider integrations** | Connect to live APIs (TMDB, AniList/Jikan, IGDB, iTunes preview) with graceful fallback. | Live search returns real titles when API keys/configured; manual entry path activates automatically when offline or keys missing. | Step 4 |
 
 ## Phase 4 — Persistence Foundations
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 5 — Web persistence (IndexedDB)** | Persist Works/Mnemons/assets metadata for the web target. | In web build, mnemons survive page reloads; empty state returns only when storage cleared. Manual entries still surface in hero and details after reload. | Step 4 |
-| **Step 6 — Desktop persistence (SQLite + filesystem)** | Add desktop storage adapters mirroring web behavior. | Desktop build persists mnemons across restarts and stores placeholder assets on disk. | Step 5 |
+| **Step 6 — Web persistence (IndexedDB)** | Persist Works/Mnemons/assets metadata for the web target. | In web build, mnemons survive page reloads; empty state returns only when storage cleared. Manual entries still surface in hero and details after reload. | Step 5 |
+| **Step 7 — Desktop persistence (SQLite + filesystem)** | Add desktop storage adapters mirroring web behavior. | Desktop build persists mnemons across restarts and stores placeholder assets on disk. | Step 6 |
 
-## Phase 5 — Provider Search Experience
+## Phase 5 — Read-only Details & Audio Stub
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 7 — Provider search with deterministic fixtures** | Introduce provider abstractions plus fixture-backed results hooked into Step 1 UI. | Searching shows grouped provider results with exact-ID dedupe; selecting a fixture Work populates hero/details using cached metadata. | Step 5 |
-| **Step 8 — Real provider integrations** | Connect to live APIs (TMDB, AniList/Jikan, IGDB, iTunes preview) with graceful fallback. | Live search returns real titles when API keys/configured; manual entry path activates automatically when offline or keys missing. | Step 7 |
+| **Step 8 — Memory Details view with audio controls (stub)** | Render Details route, share components for feelings/notes, and wire a stubbed audio controller. | Selecting "Open Memory" shows read-only detail screen with placeholder cover/audio player that reacts to play/stop in UI (no actual audio yet). | Step 7 |
 
 ## Phase 6 — Asset Caching & Audio Playback
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 9 — Cover and theme caching pipeline** | Fetch and persist cover/music assets, updating Works with local URIs. | After saving a provider-backed mnemon, cover art appears in hero/details; audio play button streams cached preview when available; placeholders show when assets missing. | Step 8 |
+| **Step 9 — Cover and theme caching pipeline** | Fetch and persist cover/music assets, updating Works with local URIs. | After saving a provider-backed mnemon, cover art appears in hero/details; audio play button streams cached preview when available; placeholders show when assets missing. | Step 5 |
 | **Step 10 — Surprise hero audio behavior** | Enforce autoplay policy, stop-on-switch, and Play fallback per MVP rules. | Hero auto-plays when platform allows, otherwise surfaces a Play control; switching memories stops previous audio and (re)autoplays subject to policy. | Step 9 |
 
 ## Phase 7 — Offline Guarantees & Refinement
@@ -59,6 +59,7 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 | rev. 0 | Initial plan | Replaced with rev. 1 per feedback (ensure each step produces reviewable behavior). |
 | rev. 1 | Step 2 complete | Implemented headerless design with: (1) Empty state with "tap anywhere to begin", (2) Dark mode styling, (3) Click interaction loads sample data for demo, (4) Auto-cycling hero with smooth transitions, (5) Rotating notes with adaptive reading time. Updated WIREFRAMES.md and PROJECT.md to reflect simplified design without header. Theme toggle deferred to future settings page. |
 | rev. 2 | Step 3 complete + Phase 2 improvements | Implemented complete Add Mnemon flow with: (1) Modal overlay UI with two-step wizard, (2) Step 1: Manual entry form (Type, Title, Notes, Feelings with emojis), (3) Step 2: Optional dates (Release Year, Finished Date), (4) Feelings display as emoji+name chips with 5-max selection, (5) In-memory storage using signals, (6) Click-anywhere interaction opens Add flow, (7) New mnemons immediately surface in hero with auto-cycle, (8) Manual entries show placeholder background when no cover image, (9) Fixed timer bug where multiple timers were spawned per mnemon added. Full vertical slice working end-to-end. |
-| rev. 3 | _Pending_ | _TBD_ |
+| rev. 3 | Step 4 complete | Implemented provider search with fixtures: (1) Type-first flow - select type before searching, (2) Search-in-title - title field doubles as search box, triggers on field focus, 3+ chars (debounced) or Enter key forces search, (3) Empty search returns all results for selected type, (4) Expanded fixture data - 50+ titles across Movies/TV-Anime/Games with provider metadata (tmdb/anilist/igdb), (5) Extracted search logic into separate `search_works()` function ready for future API replacement, (6) Pagination implemented - returns 10 results per page (infrastructure for future UI), (7) Search results dropdown with cover thumbnails and year display, (8) Click result to autofill form (title, cover_url, provider_ref, and release year for Step 2), (9) Duplicate detection - prevents selecting works that already exist (same provider_source + provider_id), shows error message, (10) Unified form - manual and provider search use same UI, provider results just autofill fields, (11) Step 1 now only has Type, Title, Notes, and Feelings. Step 2 has Release Year (autofilled from search or manual entry) and Finished Date (user input date for when they completed it). Search and manual entry seamlessly coexist in one flow. |
+| rev. 4 | _Pending_ | _TBD_ |
 
 When you review a step’s implementation, we will capture your notes here and adjust downstream steps before moving forward.
