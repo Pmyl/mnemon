@@ -1151,6 +1151,7 @@ fn Step1ManualEntry(
                                 "flex items-center gap-2 px-4 py-3 bg-gray-700 text-gray-300 rounded-lg border-2 border-gray-600 hover:border-gray-500 font-medium"
                             },
                             onclick: move |_| {
+                                info!("[DEBUG] Type selected: {}", work_type.label());
                                 local_form.with_mut(|f| {
                                     f.work_type = Some(work_type.clone());
                                     // Clear provider data when changing type
@@ -1160,6 +1161,7 @@ fn Step1ManualEntry(
                                 });
                                 existing_work_error.set(false);
                                 current_page.set(0);
+                                info!("[DEBUG] Type changed - cleared provider data");
                                 // Don't trigger search on type selection
                             },
                             span { class: "text-xl", "{work_type.icon()}" }
@@ -1189,10 +1191,15 @@ fn Step1ManualEntry(
                     disabled: local_form().work_type.is_none(),
                     onfocus: move |_| {
                         // Trigger search when field is focused
+                        info!("[DEBUG] Title field focused");
                         if local_form().work_type.is_some() {
                             current_page.set(0);
                             perform_search(local_form().title.clone(), local_form().work_type.clone(), false, 0);
+                            info!("[DEBUG] Search triggered on focus");
                         }
+                    },
+                    onblur: move |_| {
+                        show_results.set(false);
                     },
                     oninput: move |e| {
                         let value = e.value();
@@ -1227,11 +1234,14 @@ fn Step1ManualEntry(
                                 onclick: {
                                     let result_clone = result.clone();
                                     move |_| {
+                                        web_sys::console::log_1(&format!("[DEBUG] Result clicked: {}", result_clone.title).into());
                                         // Check if work already exists
                                         if check_existing_work(&result_clone.provider_ref) {
+                                            web_sys::console::log_1(&"[DEBUG] Work already exists - showing error".into());
                                             existing_work_error.set(true);
                                             show_results.set(false);
                                         } else {
+                                            web_sys::console::log_1(&"[DEBUG] Autofilling form with result".into());
                                             // Autofill form with provider result
                                             local_form.with_mut(|f| {
                                                 f.title = result_clone.title.clone();
@@ -1242,6 +1252,7 @@ fn Step1ManualEntry(
                                             });
                                             existing_work_error.set(false);
                                             show_results.set(false);
+                                            web_sys::console::log_1(&"[DEBUG] Form autofilled, dropdown closed".into());
                                         }
                                     }
                                 },

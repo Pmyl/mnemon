@@ -4782,6 +4782,7 @@ dependencies = [
  "getrandom 0.2.16",
  "gloo-timers",
  "rand 0.8.5",
+ "web-sys",
 ]
 
 [[package]]
