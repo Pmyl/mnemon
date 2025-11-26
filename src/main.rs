@@ -8,20 +8,20 @@ fn main() {
     dioxus::launch(App);
 }
 
-// Fixed feelings taxonomy
-const FEELINGS: &[&str] = &[
-    "Nostalgic",
-    "Cozy",
-    "Melancholic",
-    "Epic",
-    "Wholesome",
-    "Bittersweet",
-    "Heartwarming",
-    "Chill",
-    "Adventurous",
-    "Uplifting",
-    "Mysterious",
-    "Somber",
+// Fixed feelings taxonomy with emojis
+const FEELINGS: &[(&str, &str)] = &[
+    ("Nostalgic", "🌅"),
+    ("Cozy", "☕"),
+    ("Melancholic", "🌧️"),
+    ("Epic", "⚔️"),
+    ("Wholesome", "💚"),
+    ("Bittersweet", "🍃"),
+    ("Heartwarming", "💝"),
+    ("Chill", "😎"),
+    ("Adventurous", "🗺️"),
+    ("Uplifting", "🎈"),
+    ("Mysterious", "🔮"),
+    ("Somber", "🌑"),
 ];
 
 // Mock data structures
@@ -625,25 +625,62 @@ fn Step1ManualEntry(
                 }
             }
 
-            // Year input
+            // Notes
+            div {
+                class: "mb-6",
+                label {
+                    class: "block text-white text-sm font-semibold mb-2",
+                    "Notes"
+                }
+                textarea {
+                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none min-h-[120px] resize-y",
+                    placeholder: "Add your thoughts, memories, or reflections...",
+                    value: "{local_form().notes}",
+                    oninput: move |e| {
+                        local_form.with_mut(|f| f.notes = e.value());
+                    }
+                }
+            }
+
+            // Feelings
             div {
                 class: "mb-8",
                 label {
-                    class: "block text-white text-sm font-semibold mb-2",
-                    "Release Year"
-                    span { class: "text-gray-400 ml-1 text-xs", "(optional)" }
+                    class: "block text-white text-sm font-semibold mb-3",
+                    "Feelings"
+                    span { class: "text-gray-400 ml-2 text-xs", "(choose up to 5)" }
                 }
-                input {
-                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none",
-                    r#type: "text",
-                    placeholder: "YYYY",
-                    value: "{local_form().year}",
-                    maxlength: 4,
-                    oninput: move |e| {
-                        let value = e.value();
-                        // Only allow digits
-                        if value.chars().all(|c| c.is_ascii_digit()) {
-                            local_form.with_mut(|f| f.year = value);
+                div {
+                    class: "flex flex-wrap gap-2",
+                    for (feeling_name, feeling_emoji) in FEELINGS {
+                        {
+                            let is_selected = local_form().feelings.contains(&feeling_name.to_string());
+                            let feelings_count = local_form().feelings.len();
+                            let can_add = feelings_count < 5;
+
+                            rsx! {
+                                button {
+                                    class: if is_selected {
+                                        "px-4 py-2 bg-blue-600 text-white rounded-full border-2 border-blue-500 text-sm font-medium"
+                                    } else if can_add {
+                                        "px-4 py-2 bg-gray-700 text-gray-300 rounded-full border-2 border-gray-600 hover:border-gray-500 text-sm font-medium"
+                                    } else {
+                                        "px-4 py-2 bg-gray-800 text-gray-500 rounded-full border-2 border-gray-700 text-sm font-medium cursor-not-allowed"
+                                    },
+                                    disabled: !is_selected && !can_add,
+                                    onclick: move |_| {
+                                        local_form.with_mut(|f| {
+                                            if is_selected {
+                                                f.feelings.retain(|s| s != feeling_name);
+                                            } else if can_add {
+                                                f.feelings.push(feeling_name.to_string());
+                                            }
+                                        });
+                                    },
+                                    span { class: "mr-1", "{feeling_emoji}" }
+                                    span { "{feeling_name}" }
+                                }
+                            }
                         }
                     }
                 }
@@ -697,13 +734,36 @@ fn Step2Personalize(
                 }
                 p {
                     class: "text-gray-400",
-                    "Step 2: Personalize (all optional)"
+                    "Step 2: Optional dates"
+                }
+            }
+
+            // Year input
+            div {
+                class: "mb-6",
+                label {
+                    class: "block text-white text-sm font-semibold mb-2",
+                    "Release Year"
+                }
+                input {
+                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none",
+                    r#type: "text",
+                    placeholder: "YYYY",
+                    value: "{local_form().year}",
+                    maxlength: 4,
+                    oninput: move |e| {
+                        let value = e.value();
+                        // Only allow digits
+                        if value.chars().all(|c| c.is_ascii_digit()) {
+                            local_form.with_mut(|f| f.year = value);
+                        }
+                    }
                 }
             }
 
             // Finished date
             div {
-                class: "mb-6",
+                class: "mb-8",
                 label {
                     class: "block text-white text-sm font-semibold mb-2",
                     "Finished date"
@@ -715,70 +775,6 @@ fn Step2Personalize(
                     oninput: move |e| {
                         local_form.with_mut(|f| f.finished_date = e.value());
                     }
-                }
-            }
-
-            // Feelings
-            div {
-                class: "mb-6",
-                label {
-                    class: "block text-white text-sm font-semibold mb-3",
-                    "Feelings"
-                    span { class: "text-gray-400 ml-2 text-xs", "(choose up to 5)" }
-                }
-                div {
-                    class: "flex flex-wrap gap-2",
-                    for feeling in FEELINGS {
-                        {
-                            let is_selected = local_form().feelings.contains(&feeling.to_string());
-                            let feelings_count = local_form().feelings.len();
-                            let can_add = feelings_count < 5;
-
-                            rsx! {
-                                button {
-                                    class: if is_selected {
-                                        "px-4 py-2 bg-blue-600 text-white rounded-full border-2 border-blue-500 text-sm font-medium"
-                                    } else if can_add {
-                                        "px-4 py-2 bg-gray-700 text-gray-300 rounded-full border-2 border-gray-600 hover:border-gray-500 text-sm font-medium"
-                                    } else {
-                                        "px-4 py-2 bg-gray-800 text-gray-500 rounded-full border-2 border-gray-700 text-sm font-medium cursor-not-allowed"
-                                    },
-                                    disabled: !is_selected && !can_add,
-                                    onclick: move |_| {
-                                        local_form.with_mut(|f| {
-                                            if is_selected {
-                                                f.feelings.retain(|s| s != feeling);
-                                            } else if can_add {
-                                                f.feelings.push(feeling.to_string());
-                                            }
-                                        });
-                                    },
-                                    "{feeling}"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Notes
-            div {
-                class: "mb-8",
-                label {
-                    class: "block text-white text-sm font-semibold mb-2",
-                    "Notes"
-                }
-                textarea {
-                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none min-h-[200px] resize-y",
-                    placeholder: "Add your thoughts, memories, or reflections...",
-                    value: "{local_form().notes}",
-                    oninput: move |e| {
-                        local_form.with_mut(|f| f.notes = e.value());
-                    }
-                }
-                p {
-                    class: "text-gray-500 text-xs mt-2",
-                    "Plain text for now. Rich text formatting coming soon."
                 }
             }
 
