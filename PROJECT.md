@@ -8,7 +8,7 @@ Mnemon is a private, nostalgia-focused app to quickly capture and resurface grea
 - Privacy: Always private. No sharing or accounts in MVP.
 - Data: Local-first and offline-capable. All user data and cached assets live on the device.
 - Accessibility/Localization: Out of scope for MVP beyond basic semantics.
-- Settings: Only theme toggle (Dark/Light).
+- Settings: Out of scope for MVP. Theme toggle (Dark/Light) deferred to future settings page. MVP uses Dark mode only.
 
 ## Core Concepts
 - Work
@@ -20,26 +20,22 @@ Mnemon is a private, nostalgia-focused app to quickly capture and resurface grea
   - Personal fields are optional; this is not a tracking app—no ratings/status.
 
 ## Homepage (Minimal, Surprise-first)
-- Layout: Header + Full-page Hero (no other sections in MVP).
-- Header:
-  - Logo (left)
-  - + Add button
-  - Theme toggle (Dark/Light)
+- Layout: Full-page Hero only (no header, no other sections in MVP).
+- Interaction: Click/tap anywhere on the page to add a new mnemon.
 - Full-page Hero (Surprise Me mode):
   - Displays a single randomly selected existing mnemon (if any).
   - Visual: Large cover image background with subtle vignette/grain; overlaid title (English), year, and type icon.
-  - Music: Plays the Work’s theme music automatically when allowed by the platform; otherwise shows a single-tap “Play” icon to initiate audio.
-  - Optional visible fields: feelings (chips), finished date (if present), first ~2 lines of notes.
-  - Actions:
-    - Next Surprise: randomize to another mnemon.
-    - Open Memory: navigate to read-only Memory Details.
+  - Music: Plays the Work's theme music automatically when allowed by the platform; otherwise shows a single-tap "Play" icon to initiate audio.
+  - Optional visible fields: feelings (chips), notes (rotating display with adaptive reading time).
+  - Auto-cycle: Advances through mnemons every 10 seconds with smooth slide transitions.
 - Empty State (no mnemons):
-  - Centered CTA: “Add your first mnemon” with a large + Add button.
-  - Subtext: “Capture a great movie, TV/anime, or game you loved. Nostalgia awaits.”
+  - Centered CTA: "Add your first mnemon"
+  - Subtext: "Capture a great movie, TV/anime, or game you loved. Nostalgia awaits."
+  - Instruction: "Tap anywhere to begin"
 
 ## Add Mnemon Flow (Two Steps, Minimal Required)
 - Entry points:
-  - Header: + Add
+  - Click/tap anywhere on the homepage hero
 - Step 1 — Pick the Work
   - Search (English titles) across Movies, TV/Anime, Games via providers.
   - Result item shows: cover (if provided), Title (Year), Type.
@@ -145,7 +141,7 @@ Data and Offline
 - Manual entries correctly show a placeholder cover and no music.
 
 Settings
-- Theme toggle exists and persists locally (Dark/Light only).
+- None in MVP. Theme toggle (Dark/Light) deferred to future settings page.
 
 Out of Scope (MVP)
 - Editing or deleting mnemons or works.

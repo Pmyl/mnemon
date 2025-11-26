@@ -8,13 +8,16 @@ Scope
 - Local-first, offline-capable. Assets (covers/music) cached locally.
 
 Global UI
-- Header (persistent):
-  - [Logo] | [+ Add] | [Theme: ☀️/🌙]
-  - Theme toggle persists locally (Dark/Light).
+- Header: none in MVP (full immersive experience).
 - Footer: none in MVP (clean, minimal).
+- Theme: Dark mode only in MVP (Light mode and theme toggle deferred to future settings page).
 - Typography/visual style:
   - Nostalgic, soft grain allowed on imagery.
   - Image-forward; minimal text lines, subtle overlays.
+- Interaction:
+  - Click/tap anywhere on the page to add a new mnemon.
+  - Hero auto-cycles through memories every 10 seconds.
+  - Notes rotate with adaptive reading time based on length.
 - Audio behavior (global rules):
   - Auto-play theme music when the platform permits. If not permitted, show a single prominent Play control (one user gesture starts audio).
   - Switching surfaced memory (via Next Surprise or navigation) stops any currently playing track before starting the new one.
@@ -24,53 +27,48 @@ Nostalgic, Cozy, Melancholic, Epic, Wholesome, Bittersweet, Heartwarming, Chill,
 
 
 1) Homepage — Full-page Surprise Me Hero
-- The homepage itself is Surprise Me. There is no separate “Surprise Me” header button.
+- The homepage itself is Surprise Me. Full immersive, headerless experience.
 
 - Layout:
-  HEADER (fixed at top)
-  ─────────────────────────────────────────────────────────
-  HERO (fills the rest of the viewport)
-  - Background: Cover image (if available), full-bleed, subtle vignette/grain.
-  - Foreground overlay (center-left or center):
-    - Title (English), Year • Type icon (Movie | TV/Anime | Game)
-    - [Feelings chips] (if any) — small, subtle
-    - Finished on: YYYY-MM-DD (if provided)
-    - Notes preview: first ~2 lines, elided with “…” (if provided)
-    - Controls row:
-      - [Next Surprise 🔀]
-      - [Open Memory]
-    - Audio:
-      - If theme available and auto-play allowed: music starts on hero render
-      - Else: [Play ▶] button within hero overlay
-  - If theme not available: omit audio controls quietly
+  HERO (fills entire viewport)
+  - Background: Cover image (if available), full-bleed, subtle vignette/grain overlay.
+  - Foreground overlay:
+    - Lower left: Rotating note quotes (italic, white text, fades between notes)
+      - Displays 2 randomly selected notes from current mnemon
+      - Each note shows for adaptive duration based on reading time (3-8 seconds)
+      - Smooth fade transitions between notes
+    - Bottom right: Memory metadata (footnote style)
+      - Type icon (🎬/📺/🎮) + Title
+      - Feelings chips (subtle, semi-transparent)
+  - Auto-cycle: Automatically advances to next mnemon every 10 seconds
+    - Smooth slide transition (current slides left, next slides in from right)
   - Tap/click behavior:
-    - Next Surprise: randomize to a different mnemon; cross-fade visual if desired; stop previous audio and (if allowed) auto-play new one.
-    - Open Memory: go to read-only Memory Details.
+    - Click anywhere on the page to add a new mnemon (launches Add flow)
+  - Audio (future):
+    - If theme available and auto-play allowed: music starts on hero render
+    - Else: [Play ▶] button within hero overlay
+  - If theme not available: omit audio controls quietly
 
 - Empty state (no mnemons):
   HERO (centered content; no background cover)
-  - Title: “Add your first mnemon”
-  - Subtitle: “Capture a great movie, TV/anime, or game you loved. Nostalgia awaits.”
-  - [ + Add ] (primary)
+  - Title: "Add your first mnemon"
+  - Subtitle: "Capture a great movie, TV/anime, or game you loved. Nostalgia awaits."
+  - Tap/click behavior: Click anywhere to add first mnemon
 
 - Keyboard/navigation:
-  - Tab order (when there is at least one mnemon):
-    - Header: + Add → Theme
-    - Hero: Next Surprise → Open Memory → Play (if present)
-  - Tab order (empty state):
-    - Header: + Add → Theme
-    - Hero: + Add (primary CTA)
-  - Escape or Back from details returns to hero.
+  - Escape or Back from Add flow or details returns to hero.
+  - Spacebar: pause/resume auto-cycle (future)
 
-- Randomization:
-  - Uniform random from existing mnemons.
-  - If only one mnemon exists, Next Surprise re-surfaces the same entry.
+- Cycling behavior:
+  - Auto-advances through all mnemons in sequence
+  - Wraps around to first after reaching last
+  - Continuous loop while on homepage
 
 
 2) Add Mnemon — Two-step flow (minimal required)
 
 Entry points
-- Header [+ Add] from any screen (homepage hero).
+- Click/tap anywhere on the homepage hero.
 
 Step 1: Pick the Work
 
@@ -135,12 +133,10 @@ Step 2: Personalize (all optional)
     - Optional toast: “Mnemon added.”
 
 
-3) Memory Details — Read-only
+3) Memory Details — Read-only (future)
 
 - Layout:
-  HEADER (Back to Home)
-  ─────────────────────────────────────────────────────────
-  CONTENT
+  CONTENT (with back gesture/button)
   - Top section:
     - Cover image (cached) or placeholder (manual Work)
     - Title (English) (prominent)
@@ -162,11 +158,11 @@ Step 2: Personalize (all optional)
 
 
 Microcopy (examples)
-- Empty state CTA: “Add your first mnemon”
-- Search placeholder: “Search movies, TV/anime, and games in English…”
-- No results: “Didn’t find it? Create a Manual Entry.”
-- Manual entry labels: “Type”, “Title (English)”, “Release year”
-- Save confirmation (non-blocking toast): “Mnemon added.”
+- Empty state CTA: "Add your first mnemon" / "Tap anywhere to begin"
+- Search placeholder: "Search movies, TV/anime, and games in English…"
+- No results: "Didn't find it? Create a Manual Entry."
+- Manual entry labels: "Type", "Title (English)", "Release year"
+- Save confirmation (non-blocking toast): "Mnemon added."
 
 
 States and Behaviors Summary

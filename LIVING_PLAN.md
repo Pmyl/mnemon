@@ -17,12 +17,12 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 ## Phase 1 — Hero Shell & Empty State
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 2 — App shell with empty Surprise hero** | Theme toggle and hero layout using static placeholder data. | Running app shows header, theme toggle switching visual state, and hero empty state per wireframe. | Step 1 |
+| **Step 2 — App shell with empty Surprise hero** ✅ | Hero layout with empty state using static placeholder data. | Running app shows hero empty state per wireframe. Click anywhere to load sample data and see hero auto-cycle through memories with smooth transitions. | Step 1 |
 
 ## Phase 2 — Manual Mnemon Vertical Slice
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 3 — Manual Add flow creates surfacing mnemons** | Implement Step 1 (manual-only entry), Step 2 personalization, and in-memory storage used by the hero. | You can add a manual mnemon, return to hero, and see it surfaced (with feelings/date/notes preview). “Next Surprise” cycles through session data. | Step 2 |
+| **Step 3 — Manual Add flow creates surfacing mnemons** ✅ | Implement Step 1 (manual-only entry), Step 2 personalization, and in-memory storage used by the hero. | You can add a manual mnemon, return to hero, and see it surfaced (with feelings/notes preview). Auto-cycle continues through all session mnemons. | Step 2 |
 
 ## Phase 3 — Read-only Details & Audio Stub
 | Step | Goal | Reviewable Outcome | Dependencies |
@@ -57,6 +57,8 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 | Revision | Reviewer Notes | Plan Adjustments |
 | --- | --- | --- |
 | rev. 0 | Initial plan | Replaced with rev. 1 per feedback (ensure each step produces reviewable behavior). |
-| rev. 1 | _Pending_ | _TBD_ |
+| rev. 1 | Step 2 complete | Implemented headerless design with: (1) Empty state with "tap anywhere to begin", (2) Dark mode styling, (3) Click interaction loads sample data for demo, (4) Auto-cycling hero with smooth transitions, (5) Rotating notes with adaptive reading time. Updated WIREFRAMES.md and PROJECT.md to reflect simplified design without header. Theme toggle deferred to future settings page. |
+| rev. 2 | Step 3 complete | Implemented complete Add Mnemon flow with: (1) Modal overlay UI with two-step wizard, (2) Step 1: Manual entry form (Type, Title, Year), (3) Step 2: Personalization form (Finished date, Feelings chips with 5-max selection, Notes textarea), (4) In-memory storage using signals, (5) Click-anywhere interaction opens Add flow, (6) New mnemons immediately surface in hero with auto-cycle, (7) Manual entries show placeholder background when no cover image. Full vertical slice working end-to-end. |
+| rev. 3 | _Pending_ | _TBD_ |
 
 When you review a step’s implementation, we will capture your notes here and adjust downstream steps before moving forward.
