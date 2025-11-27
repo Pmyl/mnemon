@@ -1,5 +1,5 @@
 [package]
-name = "temp"
+name = "mnemon"
 version = "0.1.0"
 authors = ["Vittorio Guerriero <vittorio.gue@gmail.com>"]
 edition = "2021"
@@ -18,4 +18,3 @@ default = ["web"]
 web = ["dioxus/web"]
 desktop = ["dioxus/desktop"]
 mobile = ["dioxus/mobile"]
-server = ["dioxus/server"]
