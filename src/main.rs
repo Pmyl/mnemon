@@ -563,6 +563,7 @@ fn Step1ManualEntry(
 
     let is_valid = local_form().is_step1_valid() && !existing_work_error();
     let is_tmdb_configured = search_service.is_tmdb_configured();
+    let is_rawg_configured = search_service.is_rawg_configured();
 
     // Check if provider ref already exists
     let check_existing_work = move |provider_ref: &ProviderRef| -> bool {
@@ -661,7 +662,7 @@ fn Step1ManualEntry(
                 }
             }
 
-            // Provider status indicator (only for Movies/TV when not configured)
+            // Provider status indicator (when not configured)
             if !is_tmdb_configured {
                 div {
                     class: "mb-4 px-4 py-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg",
@@ -673,6 +674,21 @@ fn Step1ManualEntry(
                     p {
                         class: "text-yellow-200/70 text-sm mt-1",
                         "Set TMDB_ACCESS_TOKEN environment variable to enable movie/TV search. You can still add entries manually."
+                    }
+                }
+            }
+
+            if !is_rawg_configured {
+                div {
+                    class: "mb-4 px-4 py-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg",
+                    div {
+                        class: "flex items-center gap-2 text-yellow-200",
+                        span { "⚠️" }
+                        span { class: "font-medium", "RAWG API not configured" }
+                    }
+                    p {
+                        class: "text-yellow-200/70 text-sm mt-1",
+                        "Set RAWG_API_KEY environment variable to enable game search. You can still add entries manually."
                     }
                 }
             }

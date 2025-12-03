@@ -4,7 +4,7 @@
 //! provider based on work type:
 //! - Movies: TMDB API
 //! - TV/Anime: TMDB API
-//! - Games: Fixture data (temporary, until IGDB integration)
+//! - Games: RAWG API
 
 #![allow(dead_code)]
 
@@ -12,9 +12,9 @@ pub mod fixtures;
 
 use crate::constants::SEARCH_PAGE_SIZE;
 use crate::models::{SearchResult, SearchResultsPage, WorkType};
+use crate::providers::rawg::RawgClient;
 use crate::providers::tmdb::TmdbClient;
 use crate::providers::{ProviderError, ProviderStatus};
-use fixtures::get_game_fixtures;
 use std::sync::Arc;
 use tracing::info;
 
@@ -84,6 +84,7 @@ impl SearchResponse {
 #[derive(Clone)]
 pub struct SearchService {
     tmdb: Arc<TmdbClient>,
+    rawg: Arc<RawgClient>,
 }
 
 impl SearchService {
@@ -91,6 +92,7 @@ impl SearchService {
     pub fn new() -> Self {
         Self {
             tmdb: Arc::new(TmdbClient::new()),
+            rawg: Arc::new(RawgClient::new()),
         }
     }
 
@@ -99,15 +101,20 @@ impl SearchService {
         self.tmdb.status() == ProviderStatus::Available
     }
 
+    /// Check if RAWG is configured
+    pub fn is_rawg_configured(&self) -> bool {
+        self.rawg.status() == ProviderStatus::Available
+    }
+
     /// Search for works by query and type
     ///
     /// Routes to the appropriate provider:
     /// - Movies/TV: TMDB API (if configured)
-    /// - Games: Fixture data
+    /// - Games: RAWG API (if configured)
     pub async fn search(&self, query: &str, work_type: WorkType, page: usize) -> SearchResponse {
         match work_type {
             WorkType::Movie | WorkType::TvAnime => self.search_tmdb(query, work_type, page).await,
-            WorkType::Game => self.search_games_fixtures(query, page),
+            WorkType::Game => self.search_rawg(query, page).await,
         }
     }
 
@@ -141,42 +148,34 @@ impl SearchService {
         }
     }
 
-    /// Search games using fixture data
-    fn search_games_fixtures(&self, query: &str, page: usize) -> SearchResponse {
-        let fixtures = get_game_fixtures();
+    /// Search games using RAWG API
+    async fn search_rawg(&self, query: &str, page: usize) -> SearchResponse {
+        // Check if RAWG is configured
+        if !self.is_rawg_configured() {
+            info!("RAWG not configured, returning empty results");
+            return SearchResponse::not_configured();
+        }
 
-        // Filter by query
-        let filtered: Vec<SearchResult> = fixtures
-            .into_iter()
-            .filter(|r| {
-                if query.is_empty() {
-                    true
-                } else {
-                    r.title.to_lowercase().contains(&query.to_lowercase())
+        // Don't search with empty query
+        if query.trim().is_empty() {
+            return SearchResponse::success(Vec::new(), Some(0));
+        }
+
+        // Perform the search
+        match self.rawg.search(query, page).await {
+            Ok(results) => {
+                info!("RAWG search returned {} results", results.len());
+                SearchResponse::success(results, None)
+            }
+            Err(e) => {
+                info!("RAWG search error: {}", e);
+                match e {
+                    ProviderError::NetworkError(msg) => SearchResponse::network_error(msg),
+                    ProviderError::AuthError(_) => SearchResponse::not_configured(),
+                    _ => SearchResponse::network_error(e.to_string()),
                 }
-            })
-            .collect();
-
-        let total_count = filtered.len();
-        let total_pages = (total_count as f32 / SEARCH_PAGE_SIZE as f32).ceil() as usize;
-        let start_idx = page * SEARCH_PAGE_SIZE;
-        let end_idx = (start_idx + SEARCH_PAGE_SIZE).min(total_count);
-
-        let results = if start_idx < total_count {
-            filtered[start_idx..end_idx].to_vec()
-        } else {
-            Vec::new()
-        };
-
-        info!(
-            "Game fixtures search for '{}': {} results (page {}/{})",
-            query,
-            results.len(),
-            page + 1,
-            total_pages.max(1)
-        );
-
-        SearchResponse::from_fixtures(results, total_count)
+            }
+        }
     }
 }
 

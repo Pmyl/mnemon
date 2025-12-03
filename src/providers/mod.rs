@@ -2,10 +2,11 @@
 //!
 //! This module contains clients for various media databases:
 //! - TMDB (The Movie Database) - Movies and TV shows
-//! - Fixtures - Static data for Games (temporary)
+//! - RAWG (Video Games Database) - Video games
 
 #![allow(dead_code)]
 
+pub mod rawg;
 pub mod tmdb;
 
 use crate::models::{SearchResult, WorkType};

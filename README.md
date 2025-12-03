@@ -39,8 +39,8 @@ npx @tailwindcss/cli -i ./tailwind.css -o ./assets/tailwind.css --watch
 
 Run the following command in the root of your project to start developing with the default platform:
 
-```bash
-export TMDB_ACCESS_TOKEN="$(grep TMDB_ACCESS_TOKEN .env | cut -d'=' -f2)" && dx serve
+```fish
+for line in (cat .env | grep -v '^#' | grep -v '^\s*$'); set -gx (echo $line | cut -d= -f1) (echo $line | cut -d= -f2-); end; dx serve
 ```
 
 To run for a different platform, use the `--platform platform` flag. E.g.
