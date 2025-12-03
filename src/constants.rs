@@ -32,6 +32,9 @@ pub const WORDS_PER_SECOND: f64 = 4.0;
 /// Minimum characters required to trigger auto-search (can be bypassed with Enter)
 pub const SEARCH_MIN_CHARS: usize = 3;
 
+/// Debounce delay in milliseconds before triggering search after typing stops
+pub const SEARCH_DEBOUNCE_MS: u32 = 300;
+
 /// Number of search results per page
 pub const SEARCH_PAGE_SIZE: usize = 10;
 

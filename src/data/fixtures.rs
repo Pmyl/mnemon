@@ -1,13 +1,16 @@
 //! Fixture data for development and testing
 //!
 //! This module contains hardcoded search results that simulate provider API responses.
-//! In production, these will be replaced with real API calls.
+//! Games still use fixtures until IGDB integration is complete.
+//! Movies and TV/Anime now use TMDB API.
+
+#![allow(dead_code)]
 
 use crate::models::{ProviderRef, SearchResult, WorkType};
 
-/// Returns fixture search results simulating provider API data
+/// Returns all fixture search results (legacy, kept for backward compatibility)
 ///
-/// Contains 50+ titles across Movies, TV/Anime, and Games with realistic
+/// Contains titles across Movies, TV/Anime, and Games with realistic
 /// provider metadata (TMDB, AniList, IGDB).
 pub fn get_fixture_search_results() -> Vec<SearchResult> {
     vec![
@@ -290,6 +293,135 @@ pub fn get_fixture_search_results() -> Vec<SearchResult> {
         // =============================================================================
         // GAMES (IGDB)
         // =============================================================================
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "7346"),
+            title: "The Legend of Zelda: Breath of the Wild".to_string(),
+            year: Some(2017),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co3p2d.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "26844"),
+            title: "Hollow Knight".to_string(),
+            year: Some(2017),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co1rgi.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "1942"),
+            title: "The Witcher 3: Wild Hunt".to_string(),
+            year: Some(2015),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co1wyy.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "1020"),
+            title: "Grand Theft Auto V".to_string(),
+            year: Some(2013),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co2lbd.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "1074"),
+            title: "Red Dead Redemption 2".to_string(),
+            year: Some(2018),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co1q1f.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "11208"),
+            title: "Elden Ring".to_string(),
+            year: Some(2022),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co4jni.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "119171"),
+            title: "Baldur's Gate 3".to_string(),
+            year: Some(2023),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co5s5v.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "1877"),
+            title: "Cyberpunk 2077".to_string(),
+            year: Some(2020),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co2vt0.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "11156"),
+            title: "Sekiro: Shadows Die Twice".to_string(),
+            year: Some(2019),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co1ixg.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "113285"),
+            title: "Hades".to_string(),
+            year: Some(2020),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co2i0u.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "26192"),
+            title: "Celeste".to_string(),
+            year: Some(2018),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co1tnq.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+        SearchResult {
+            provider_ref: ProviderRef::new("igdb", "25076"),
+            title: "Stardew Valley".to_string(),
+            year: Some(2016),
+            work_type: WorkType::Game,
+            cover_url: Some(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/co5qkw.png".to_string(),
+            ),
+            theme_music_url: None,
+        },
+    ]
+}
+
+/// Returns only game fixture data
+///
+/// Used for Games search until IGDB integration is complete.
+/// Movies and TV/Anime use TMDB API instead.
+pub fn get_game_fixtures() -> Vec<SearchResult> {
+    vec![
         SearchResult {
             provider_ref: ProviderRef::new("igdb", "7346"),
             title: "The Legend of Zelda: Breath of the Wild".to_string(),

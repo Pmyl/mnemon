@@ -7,9 +7,10 @@ use uuid::Uuid;
 mod constants;
 mod data;
 mod models;
+mod providers;
 
 use constants::*;
-use data::search_works;
+use data::{SearchService, SearchStatus};
 use models::*;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -545,14 +546,102 @@ fn Step1ManualEntry(
     let mut search_results = use_signal(Vec::<SearchResult>::new);
     let mut show_results = use_signal(|| false);
     let mut existing_work_error = use_signal(|| false);
+    let mut is_searching = use_signal(|| false);
+    let mut search_status = use_signal(|| Option::<SearchStatus>::None);
+
+    // Search trigger signals - when these change, a search is triggered
+    let mut search_query = use_signal(String::new);
+    let mut search_type = use_signal(|| Option::<WorkType>::None);
+    let mut search_force = use_signal(|| false);
+    let mut search_version = use_signal(|| 0u32);
+
     let app_state = use_context::<Signal<AppState>>();
 
+    // Create search service once
+    let search_service = use_hook(SearchService::new);
+
     let is_valid = local_form().is_step1_valid() && !existing_work_error();
+    let is_tmdb_configured = search_service.is_tmdb_configured();
 
     // Check if provider ref already exists
     let check_existing_work = move |provider_ref: &ProviderRef| -> bool {
         app_state().has_mnemon_for_provider_ref(provider_ref)
     };
+
+    // Effect-based async search with debouncing
+    {
+        let service = search_service.clone();
+        use_effect(move || {
+            let query = search_query();
+            let work_type = search_type();
+            let force = search_force();
+            let version = search_version();
+
+            // Reset force flag
+            if force {
+                search_force.set(false);
+            }
+
+            // Don't search if no work type selected
+            let Some(wt) = work_type else {
+                return;
+            };
+
+            // Don't search if query is too short (unless forced or empty)
+            if !force && !query.is_empty() && query.len() < SEARCH_MIN_CHARS {
+                search_results.set(Vec::new());
+                show_results.set(false);
+                return;
+            }
+
+            is_searching.set(true);
+            search_status.set(None);
+
+            let service = service.clone();
+            spawn(async move {
+                // Debounce delay (skip if forced search)
+                if !force {
+                    gloo_timers::future::TimeoutFuture::new(SEARCH_DEBOUNCE_MS).await;
+                }
+
+                // Check if this search is still valid
+                if search_version() != version {
+                    info!("Search cancelled (superseded)");
+                    return;
+                }
+
+                info!("Executing search for '{}' ({:?})", query, wt);
+                let response = service.search(&query, wt, 0).await;
+
+                // Check again after async operation
+                if search_version() != version {
+                    info!("Search results discarded (superseded)");
+                    return;
+                }
+
+                is_searching.set(false);
+                search_status.set(Some(response.status.clone()));
+
+                match response.status {
+                    SearchStatus::Success | SearchStatus::UsingFixtures => {
+                        info!("Search returned {} results", response.results.len());
+                        search_results.set(response.results);
+                        show_results.set(true);
+                    }
+                    SearchStatus::ProviderNotConfigured => {
+                        info!("Provider not configured");
+                        search_results.set(Vec::new());
+                        show_results.set(true);
+                    }
+                    SearchStatus::NetworkError(ref msg) => {
+                        info!("Network error: {}", msg);
+                        search_results.set(Vec::new());
+                        show_results.set(true);
+                    }
+                }
+            });
+        });
+    }
 
     rsx! {
         div {
@@ -568,6 +657,22 @@ fn Step1ManualEntry(
                 p {
                     class: "text-gray-400",
                     "Step 1: Pick the Work"
+                }
+            }
+
+            // Provider status indicator (only for Movies/TV when not configured)
+            if !is_tmdb_configured {
+                div {
+                    class: "mb-4 px-4 py-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg",
+                    div {
+                        class: "flex items-center gap-2 text-yellow-200",
+                        span { "⚠️" }
+                        span { class: "font-medium", "TMDB API not configured" }
+                    }
+                    p {
+                        class: "text-yellow-200/70 text-sm mt-1",
+                        "Set TMDB_ACCESS_TOKEN environment variable to enable movie/TV search. You can still add entries manually."
+                    }
                 }
             }
 
@@ -598,6 +703,10 @@ fn Step1ManualEntry(
                                     f.theme_music_url = None;
                                 });
                                 existing_work_error.set(false);
+                                search_results.set(Vec::new());
+                                show_results.set(false);
+                                search_status.set(None);
+                                search_type.set(Some(work_type.clone()));
                             },
                             span { class: "text-xl", "{work_type.icon()}" }
                             span { "{work_type.label()}" }
@@ -614,76 +723,116 @@ fn Step1ManualEntry(
                     "Title (English)"
                     span { class: "text-red-400 ml-1", "*" }
                 }
-                input {
-                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none",
-                    r#type: "text",
-                    placeholder: if local_form().work_type.is_some() {
-                        "Search or enter title..."
-                    } else {
-                        "Select a type first..."
-                    },
-                    value: "{local_form().title}",
-                    disabled: local_form().work_type.is_none(),
-                    onfocus: move |_| {
-                        info!("Title field focused");
-                        if let Some(ref wt) = local_form().work_type {
-                            let query = local_form().title.clone();
-                            if query.len() >= SEARCH_MIN_CHARS || query.is_empty() {
-                                let results_page = search_works(&query, wt.clone(), 0);
-                                info!("Search on focus for '{}': {} results", query, results_page.results.len());
-                                search_results.set(results_page.results);
-                                show_results.set(true);
+                div {
+                    class: "relative",
+                    input {
+                        class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none pr-10",
+                        r#type: "text",
+                        placeholder: if local_form().work_type.is_some() {
+                            "Search or enter title..."
+                        } else {
+                            "Select a type first..."
+                        },
+                        value: "{local_form().title}",
+                        disabled: local_form().work_type.is_none(),
+                        onfocus: move |_| {
+                            info!("Title field focused");
+                            if local_form().work_type.is_some() {
+                                search_version.set(search_version() + 1);
+                                search_query.set(local_form().title.clone());
+                                search_type.set(local_form().work_type.clone());
+                            }
+                        },
+                        onblur: move |_| {
+                            // Delay hiding to allow click on results
+                            let current_version = search_version();
+                            spawn(async move {
+                                gloo_timers::future::TimeoutFuture::new(150).await;
+                                // Only hide if no new search was triggered
+                                if search_version() == current_version {
+                                    show_results.set(false);
+                                }
+                            });
+                        },
+                        oninput: move |e| {
+                            let value = e.value();
+                            local_form.with_mut(|f| {
+                                f.title = value.clone();
+                                // Clear provider data when typing
+                                f.provider_ref = None;
+                                f.cover_url = None;
+                                f.theme_music_url = None;
+                                f.year = String::new();
+                            });
+                            existing_work_error.set(false);
+                            // Trigger debounced search
+                            search_version.set(search_version() + 1);
+                            search_query.set(value);
+                            search_type.set(local_form().work_type.clone());
+                        },
+                        onkeydown: move |e| {
+                            if e.key() == Key::Enter {
+                                e.prevent_default();
+                                // Force search on Enter regardless of query length
+                                if local_form().work_type.is_some() {
+                                    search_version.set(search_version() + 1);
+                                    search_query.set(local_form().title.clone());
+                                    search_type.set(local_form().work_type.clone());
+                                    search_force.set(true);
+                                }
                             }
                         }
-                    },
-                    onblur: move |_| {
-                        show_results.set(false);
-                    },
-                    oninput: move |e| {
-                        let value = e.value();
-                        local_form.with_mut(|f| {
-                            f.title = value.clone();
-                            // Clear provider data when typing
-                            f.provider_ref = None;
-                            f.cover_url = None;
-                            f.theme_music_url = None;
-                            f.year = String::new();
-                        });
-                        existing_work_error.set(false);
-                        // Perform search
-                        if let Some(ref wt) = local_form().work_type {
-                            if value.len() >= SEARCH_MIN_CHARS || value.is_empty() {
-                                let results_page = search_works(&value, wt.clone(), 0);
-                                search_results.set(results_page.results);
-                                show_results.set(true);
-                            } else {
-                                search_results.set(Vec::new());
-                                show_results.set(false);
-                            }
-                        }
-                    },
-                    onkeydown: move |e| {
-                        if e.key() == Key::Enter {
-                            // Force search on Enter regardless of query length
-                            if let Some(ref wt) = local_form().work_type {
-                                let query = local_form().title.clone();
-                                let results_page = search_works(&query, wt.clone(), 0);
-                                info!("Search on Enter for '{}': {} results", query, results_page.results.len());
-                                search_results.set(results_page.results);
-                                show_results.set(true);
+                    }
+
+                    // Loading spinner
+                    if is_searching() {
+                        div {
+                            class: "absolute right-3 top-1/2 -translate-y-1/2",
+                            div {
+                                class: "w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
                             }
                         }
                     }
                 }
 
                 // Search results dropdown
-                if show_results() && !search_results().is_empty() {
+                if show_results() {
                     div {
                         class: "absolute z-10 w-full mt-1 bg-gray-700 border-2 border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto",
+
+                        // Status messages
+                        match search_status() {
+                            Some(SearchStatus::ProviderNotConfigured) => rsx! {
+                                div {
+                                    class: "px-4 py-3 text-gray-400 text-sm",
+                                    "Provider not configured. Enter title manually below."
+                                }
+                            },
+                            Some(SearchStatus::NetworkError(msg)) => rsx! {
+                                div {
+                                    class: "px-4 py-3 text-yellow-400 text-sm",
+                                    "Network error: {msg}. You can enter the title manually."
+                                }
+                            },
+                            _ if search_results().is_empty() && !is_searching() && !local_form().title.is_empty() => rsx! {
+                                div {
+                                    class: "px-4 py-3 text-gray-400 text-sm",
+                                    "No results found for \"{local_form().title}\". You can enter it manually."
+                                }
+                            },
+                            _ if search_results().is_empty() && !is_searching() => rsx! {
+                                div {
+                                    class: "px-4 py-3 text-gray-400 text-sm",
+                                    "Type to search or enter title manually."
+                                }
+                            },
+                            _ => rsx! {}
+                        }
+
+                        // Results list
                         for result in search_results().iter() {
                             button {
                                 class: "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-600 border-b border-gray-600 last:border-b-0 text-left",
-                                // Use onmousedown instead of onclick to fire before the input's onblur
                                 onmousedown: {
                                     let result_clone = result.clone();
                                     move |e: MouseEvent| {
@@ -746,6 +895,15 @@ fn Step1ManualEntry(
                     div {
                         class: "mt-2 px-3 py-2 bg-red-900/50 border border-red-700 rounded text-red-200 text-sm",
                         "⚠️ This work already exists in your collection. Please search for a different title."
+                    }
+                }
+
+                // Manual entry hint when provider selected result
+                if local_form().provider_ref.is_some() {
+                    div {
+                        class: "mt-2 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded text-green-200 text-sm flex items-center gap-2",
+                        span { "✓" }
+                        span { "Selected from search results" }
                     }
                 }
             }
