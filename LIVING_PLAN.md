@@ -1,11 +1,11 @@
 # Mnemon — Living Implementation Plan
 
 
-This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJECT.md`, `WIREFRAMES.md`, `TECHNOLOGIES.md`, and `DIOXUS.md`. After every review cycle, we revise this plan so it always reflects the next actionable steps.
+This document is the evolving build plan for Mnemon's MVP, grounded in `PROJECT.md`, `WIREFRAMES.md`, `TECHNOLOGIES.md`, and `DIOXUS.md`. After every review cycle, we revise this plan so it always reflects the next actionable steps.
 
 ## Ground Rules
 - **Scope guardrails:** Respect MVP scope and exclusions exactly as defined in the specification files.
-- **Technology guardrails:** Follow the workspace layout, Dioxus 0.7 patterns, and “no unused code” policy documented in `TECHNOLOGIES.md`.
+- **Technology guardrails:** Follow the workspace layout, Dioxus 0.7 patterns, and "no unused code" policy documented in `TECHNOLOGIES.md`.
 - **Review cadence:** Every numbered step must deliver a reviewable change in the running app (UI behavior, data flow, or platform capability that you can see or verify).
 - **Documentation hygiene:** When implementation details land in code, migrate duplicate guidance from the MD playbooks into rustdoc and update references here accordingly.
 
@@ -28,7 +28,7 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
 | **Step 4 — Provider search with deterministic fixtures** ✅ | Introduce provider abstractions plus fixture-backed results hooked into Step 1 UI. | Searching shows grouped provider results with exact-ID dedupe; selecting a fixture Work populates hero/details using cached metadata. | Step 3 |
-| **Step 5 — Real provider integrations** ✅ | Connect to live APIs (TMDB, AniList/Jikan, IGDB, iTunes preview) with graceful fallback. | Live search returns real titles when API keys/configured; manual entry path activates automatically when offline or keys missing. | Step 4 |
+| **Step 5 — Real provider integrations** ✅ | Connect to live APIs (TMDB for Movies/TV, RAWG for Games) with graceful fallback. | Live search returns real titles when API keys configured; manual entry path activates automatically when offline or keys missing. | Step 4 |
 
 ## Phase 4 — Persistence Foundations
 | Step | Goal | Reviewable Outcome | Dependencies |
@@ -41,17 +41,24 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 | --- | --- | --- | --- |
 | **Step 8 — Memory Details view with audio controls (stub)** | Render Details route, share components for feelings/notes, and wire a stubbed audio controller. | Selecting "Open Memory" shows read-only detail screen with placeholder cover/audio player that reacts to play/stop in UI (no actual audio yet). | Step 7 |
 
-## Phase 6 — Asset Caching & Audio Playback
+## Phase 6 — GitHub Pages Deployment & User Token Configuration
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 9 — Cover and theme caching pipeline** | Fetch and persist cover/music assets, updating Works with local URIs. | After saving a provider-backed mnemon, cover art appears in hero/details; audio play button streams cached preview when available; placeholders show when assets missing. | Step 5 |
-| **Step 10 — Surprise hero audio behavior** | Enforce autoplay policy, stop-on-switch, and Play fallback per MVP rules. | Hero auto-plays when platform allows, otherwise surfaces a Play control; switching memories stops previous audio and (re)autoplays subject to policy. | Step 9 |
+| **Step 9 — GitHub Actions workflow for static deployment** | Create CI/CD pipeline to build and deploy the web app to GitHub Pages. | Push to main triggers automated build; site is live at `https://<user>.github.io/mnemon/` with all static assets served correctly. | Step 8 |
+| **Step 10 — Settings UI for API token configuration** | Add a Settings page/modal where users can input their own TMDB and RAWG API keys, stored in localStorage. | Users can open Settings, enter API tokens, save them; tokens persist across sessions and are used for provider searches instead of compile-time env vars. | Step 9 |
+| **Step 11 — Runtime token loading** | Refactor provider clients to read tokens from localStorage at runtime instead of compile-time env vars. | App works on GitHub Pages with user-provided tokens; shows configuration prompts when tokens missing; seamless fallback to manual entry. | Step 10 |
 
-## Phase 7 — Offline Guarantees & Refinement
+## Phase 7 — Asset Caching & Audio Playback
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 11 — Offline resilience audit** | Validate offline flows, add UX cues, and document limitations. | Demonstrated walkthrough (web & desktop) showing manual entry offline, existing mnemons surfacing with cached assets, and copy guiding offline behavior. | Step 10 |
-| **Step 12 — Quality hardening & release playbook** | Polish code/tests/docs and produce release artifacts. | Clean `cargo fmt/clippy/test` runs, migration of duplicated docs into rustdoc, generated web bundle & desktop binaries with deployment checklist. | Step 11 |
+| **Step 12 — Cover and theme caching pipeline** | Fetch and persist cover/music assets, updating Works with local URIs. | After saving a provider-backed mnemon, cover art appears in hero/details; audio play button streams cached preview when available; placeholders show when assets missing. | Step 11 |
+| **Step 13 — Surprise hero audio behavior** | Enforce autoplay policy, stop-on-switch, and Play fallback per MVP rules. | Hero auto-plays when platform allows, otherwise surfaces a Play control; switching memories stops previous audio and (re)autoplays subject to policy. | Step 12 |
+
+## Phase 8 — Offline Guarantees & Refinement
+| Step | Goal | Reviewable Outcome | Dependencies |
+| --- | --- | --- | --- |
+| **Step 14 — Offline resilience audit** | Validate offline flows, add UX cues, and document limitations. | Demonstrated walkthrough (web & desktop) showing manual entry offline, existing mnemons surfacing with cached assets, and copy guiding offline behavior. | Step 13 |
+| **Step 15 — Quality hardening & release playbook** | Polish code/tests/docs and produce release artifacts. | Clean `cargo fmt/clippy/test` runs, migration of duplicated docs into rustdoc, generated web bundle & desktop binaries with deployment checklist. | Step 14 |
 
 ## Review & Feedback Log
 | Revision | Reviewer Notes | Plan Adjustments |
@@ -60,7 +67,7 @@ This document is the evolving build plan for Mnemon’s MVP, grounded in `PROJEC
 | rev. 1 | Step 2 complete | Implemented headerless design with: (1) Empty state with "tap anywhere to begin", (2) Dark mode styling, (3) Click interaction loads sample data for demo, (4) Auto-cycling hero with smooth transitions, (5) Rotating notes with adaptive reading time. Updated WIREFRAMES.md and PROJECT.md to reflect simplified design without header. Theme toggle deferred to future settings page. |
 | rev. 2 | Step 3 complete + Phase 2 improvements | Implemented complete Add Mnemon flow with: (1) Modal overlay UI with two-step wizard, (2) Step 1: Manual entry form (Type, Title, Notes, Feelings with emojis), (3) Step 2: Optional dates (Release Year, Finished Date), (4) Feelings display as emoji+name chips with 5-max selection, (5) In-memory storage using signals, (6) Click-anywhere interaction opens Add flow, (7) New mnemons immediately surface in hero with auto-cycle, (8) Manual entries show placeholder background when no cover image, (9) Fixed timer bug where multiple timers were spawned per mnemon added. Full vertical slice working end-to-end. |
 | rev. 3 | Step 4 complete | Implemented provider search with fixtures: (1) Type-first flow - select type before searching, (2) Search-in-title - title field doubles as search box, triggers on field focus, 3+ chars (debounced) or Enter key forces search, (3) Empty search returns all results for selected type, (4) Expanded fixture data - 50+ titles across Movies/TV-Anime/Games with provider metadata (tmdb/anilist/igdb), (5) Extracted search logic into separate `search_works()` function ready for future API replacement, (6) Pagination implemented - returns 10 results per page (infrastructure for future UI), (7) Search results dropdown with cover thumbnails and year display, (8) Click result to autofill form (title, cover_url, provider_ref, and release year for Step 2), (9) Duplicate detection - prevents selecting works that already exist (same provider_source + provider_id), shows error message, (10) Unified form - manual and provider search use same UI, provider results just autofill fields, (11) Step 1 now only has Type, Title, Notes, and Feelings. Step 2 has Release Year (autofilled from search or manual entry) and Finished Date (user input date for when they completed it). Search and manual entry seamlessly coexist in one flow. |
-| rev. 4 | Step 5 complete | Implemented TMDB integration for Movies and TV/Anime: (1) **TMDB API Client** - Async HTTP client using reqwest with Bearer token auth, (2) **Compile-time token** - Reads `TMDB_ACCESS_TOKEN` env var at compile time via `option_env!()`, (3) **Debounced search** - 300ms delay after typing stops before API request fires (SEARCH_DEBOUNCE_MS constant), (4) **Loading state** - Spinner shows while search is in progress, (5) **Graceful fallback** - When TMDB not configured, shows warning banner and allows manual entry, (6) **Network error handling** - Displays error message and allows manual entry on failures, (7) **Search versioning** - Cancels stale searches when user types faster than debounce, (8) **Games remain fixture-based** - IGDB integration deferred to future step, (9) **New module structure** - `src/providers/` with `mod.rs` (traits/errors) and `tmdb.rs` (client), (10) **SearchService** - Unified search routing to TMDB or fixtures based on WorkType, (11) **SearchStatus enum** - Tracks Success/ProviderNotConfigured/NetworkError/UsingFixtures for UI feedback, (12) **Improved manual entry UX** - Shows "Selected from search results" indicator, helpful messages when no results found. To use: `export TMDB_ACCESS_TOKEN="your_token"` before `dx serve`. |
+| rev. 4 | Step 5 complete | Implemented TMDB integration for Movies and TV/Anime, RAWG integration for Games: (1) **TMDB API Client** - Async HTTP client using reqwest with Bearer token auth, (2) **RAWG API Client** - Simple REST API with key-based auth for games (replaced IGDB due to CORS restrictions), (3) **Compile-time tokens** - Reads `TMDB_ACCESS_TOKEN` and `RAWG_API_KEY` env vars at compile time via `option_env!()`, (4) **Debounced search** - 300ms delay after typing stops before API request fires (SEARCH_DEBOUNCE_MS constant), (5) **Loading state** - Spinner shows while search is in progress, (6) **Graceful fallback** - When providers not configured, shows warning banner and allows manual entry, (7) **Network error handling** - Displays error message and allows manual entry on failures, (8) **Search versioning** - Cancels stale searches when user types faster than debounce, (9) **New module structure** - `src/providers/` with `mod.rs` (traits/errors), `tmdb.rs`, and `rawg.rs`, (10) **SearchService** - Unified search routing to appropriate provider based on WorkType, (11) **SearchStatus enum** - Tracks Success/ProviderNotConfigured/NetworkError/UsingFixtures for UI feedback. To use locally: `export TMDB_ACCESS_TOKEN="..." RAWG_API_KEY="..."` before `dx serve`. |
 | rev. 5 | _Pending_ | _TBD_ |
 
-When you review a step’s implementation, we will capture your notes here and adjust downstream steps before moving forward.
+When you review a step's implementation, we will capture your notes here and adjust downstream steps before moving forward.
