@@ -1,4 +1,16 @@
+//! Mnemon - A nostalgia-focused app to capture and resurface memories from Movies, TV/Anime, and Games
+
 use dioxus::prelude::*;
+use tracing::info;
+use uuid::Uuid;
+
+mod constants;
+mod data;
+mod models;
+
+use constants::*;
+use data::search_works;
+use models::*;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -8,566 +20,93 @@ fn main() {
     dioxus::launch(App);
 }
 
-// Fixed feelings taxonomy with emojis
-const FEELINGS: &[(&str, &str)] = &[
-    ("Nostalgic", "🌅"),
-    ("Cozy", "☕"),
-    ("Melancholic", "🌧️"),
-    ("Epic", "⚔️"),
-    ("Wholesome", "💚"),
-    ("Bittersweet", "🍃"),
-    ("Heartwarming", "💝"),
-    ("Chill", "😎"),
-    ("Adventurous", "🗺️"),
-    ("Uplifting", "🎈"),
-    ("Mysterious", "🔮"),
-    ("Somber", "🌑"),
-];
+// =============================================================================
+// APPLICATION STATE
+// =============================================================================
 
-// Mock data structures
+/// Combined view of a Mnemon with its associated Work data
+/// Used for displaying in the UI without needing to look up Work separately
 #[derive(Clone, PartialEq, Debug)]
-enum WorkType {
-    Movie,
-    TvAnime,
-    Game,
+struct MnemonWithWork {
+    mnemon: Mnemon,
+    work: Work,
 }
 
-impl WorkType {
-    fn icon(&self) -> &'static str {
-        match self {
-            WorkType::Movie => "🎬",
-            WorkType::TvAnime => "📺",
-            WorkType::Game => "🎮",
+/// Application state container
+#[derive(Clone)]
+struct AppState {
+    works: Signal<Vec<Work>>,
+    mnemons: Signal<Vec<Mnemon>>,
+}
+
+impl AppState {
+    fn new() -> Self {
+        Self {
+            works: Signal::new(Vec::new()),
+            mnemons: Signal::new(Vec::new()),
         }
     }
 
-    fn label(&self) -> &'static str {
-        match self {
-            WorkType::Movie => "Movie",
-            WorkType::TvAnime => "TV/Anime",
-            WorkType::Game => "Game",
+    /// Get all mnemons with their associated works
+    fn get_mnemons_with_works(&self) -> Vec<MnemonWithWork> {
+        let works = self.works.read();
+        let mnemons = self.mnemons.read();
+
+        mnemons
+            .iter()
+            .filter_map(|m| {
+                works
+                    .iter()
+                    .find(|w| w.id == m.work_id)
+                    .map(|w| MnemonWithWork {
+                        mnemon: m.clone(),
+                        work: w.clone(),
+                    })
+            })
+            .collect()
+    }
+
+    /// Find a work by provider reference
+    fn find_work_by_provider_ref(&self, provider_ref: &ProviderRef) -> Option<Work> {
+        self.works
+            .read()
+            .iter()
+            .find(|w| {
+                w.provider_ref
+                    .as_ref()
+                    .map(|pr| pr.matches(provider_ref))
+                    .unwrap_or(false)
+            })
+            .cloned()
+    }
+
+    /// Check if a work with the given provider ref already has a mnemon
+    fn has_mnemon_for_provider_ref(&self, provider_ref: &ProviderRef) -> bool {
+        if let Some(work) = self.find_work_by_provider_ref(provider_ref) {
+            self.mnemons.read().iter().any(|m| m.work_id == work.id)
+        } else {
+            false
         }
     }
-}
 
-#[derive(Clone, PartialEq, Debug)]
-struct Mnemon {
-    id: usize,
-    title: String,
-    year: Option<u16>,
-    work_type: WorkType,
-    cover_url: Option<String>,
-    provider_ref: Option<ProviderRef>,
-    feelings: Vec<String>,
-    finished_date: Option<String>,
-    notes: Vec<String>,
-}
+    /// Add a new work and return its ID
+    fn add_work(&mut self, work: Work) -> Uuid {
+        let id = work.id;
+        self.works.write().push(work);
+        id
+    }
 
-// Provider reference
-#[derive(Clone, PartialEq, Debug)]
-struct ProviderRef {
-    provider_source: String,
-    provider_id: String,
-}
-
-// Search result from provider
-#[derive(Clone, PartialEq, Debug)]
-struct SearchResult {
-    provider_ref: ProviderRef,
-    title: String,
-    year: Option<u16>,
-    work_type: WorkType,
-    cover_url: Option<String>,
-    theme_music_url: Option<String>,
-}
-
-// Fixture search data (simulating a large dataset)
-fn get_fixture_search_results() -> Vec<SearchResult> {
-    vec![
-        // Movies
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "129".to_string(),
-            },
-            title: "Spirited Away".to_string(),
-            year: Some(2001),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "146216".to_string(),
-            },
-            title: "Your Name".to_string(),
-            year: Some(2016),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/q719jXXEzOoYaps6babgKnONONX.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "120467".to_string(),
-            },
-            title: "The Grand Budapest Hotel".to_string(),
-            year: Some(2014),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/nX5XotM9yprCKarRH4fzOq1VM1J.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "550".to_string(),
-            },
-            title: "Fight Club".to_string(),
-            year: Some(1999),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "13".to_string(),
-            },
-            title: "Forrest Gump".to_string(),
-            year: Some(1994),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "278".to_string(),
-            },
-            title: "The Shawshank Redemption".to_string(),
-            year: Some(1994),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "238".to_string(),
-            },
-            title: "The Godfather".to_string(),
-            year: Some(1972),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsRolD1fZdja1.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "424".to_string(),
-            },
-            title: "Schindler's List".to_string(),
-            year: Some(1993),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "389".to_string(),
-            },
-            title: "12 Angry Men".to_string(),
-            year: Some(1957),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/ow3wq89wM8qd5X7hWKxiRfsFf9C.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "155".to_string(),
-            },
-            title: "The Dark Knight".to_string(),
-            year: Some(2008),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "497".to_string(),
-            },
-            title: "The Green Mile".to_string(),
-            year: Some(1999),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/velWPhVMQeQKcxggNEU8YmIo52R.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "680".to_string(),
-            },
-            title: "Pulp Fiction".to_string(),
-            year: Some(1994),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "769".to_string(),
-            },
-            title: "GoodFellas".to_string(),
-            year: Some(1990),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/aKuFiU82s5ISJpGZp7YkIr3kCUd.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "27205".to_string(),
-            },
-            title: "Inception".to_string(),
-            year: Some(2010),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "98".to_string(),
-            },
-            title: "Gladiator".to_string(),
-            year: Some(2000),
-            work_type: WorkType::Movie,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/ty8TGRuvJLPUmAR1H1nRIsgwvim.jpg".to_string()),
-            theme_music_url: None,
-        },
-        // TV/Anime
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "1355".to_string(),
-            },
-            title: "Cowboy Bebop".to_string(),
-            year: Some(1998),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/gZFHBd677gz8V5fyj8SZx5SrqTA.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "11061".to_string(),
-            },
-            title: "Hunter x Hunter".to_string(),
-            year: Some(2011),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx11061-sIpercRKikfh.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "5114".to_string(),
-            },
-            title: "Fullmetal Alchemist: Brotherhood".to_string(),
-            year: Some(2009),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx5114-qg9GGO3c8zqF.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "21".to_string(),
-            },
-            title: "One Piece".to_string(),
-            year: Some(1999),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-YCDoj1EkAxFn.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "1535".to_string(),
-            },
-            title: "Death Note".to_string(),
-            year: Some(2006),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx1535-4r88a1tsBEIz.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "16498".to_string(),
-            },
-            title: "Attack on Titan".to_string(),
-            year: Some(2013),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-C6FPmWm59CyP.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "11757".to_string(),
-            },
-            title: "Sword Art Online".to_string(),
-            year: Some(2012),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx11757-QlamRgbmYlbv.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "20958".to_string(),
-            },
-            title: "My Hero Academia".to_string(),
-            year: Some(2016),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx20958-UMb6Cr4l8YJ8.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "9253".to_string(),
-            },
-            title: "Steins;Gate".to_string(),
-            year: Some(2011),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx9253-7pdcVzQSkKxT.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "anilist".to_string(),
-                provider_id: "101922".to_string(),
-            },
-            title: "Demon Slayer".to_string(),
-            year: Some(2019),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx101922-PEn1CTc93blC.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "1396".to_string(),
-            },
-            title: "Breaking Bad".to_string(),
-            year: Some(2008),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "tmdb".to_string(),
-                provider_id: "1399".to_string(),
-            },
-            title: "Game of Thrones".to_string(),
-            year: Some(2011),
-            work_type: WorkType::TvAnime,
-            cover_url: Some("https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg".to_string()),
-            theme_music_url: None,
-        },
-        // Games
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "7346".to_string(),
-            },
-            title: "The Legend of Zelda: Breath of the Wild".to_string(),
-            year: Some(2017),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co3p2d.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "26844".to_string(),
-            },
-            title: "Hollow Knight".to_string(),
-            year: Some(2017),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co1rgi.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "1942".to_string(),
-            },
-            title: "The Witcher 3: Wild Hunt".to_string(),
-            year: Some(2015),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co1wyy.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "1020".to_string(),
-            },
-            title: "Grand Theft Auto V".to_string(),
-            year: Some(2013),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co2lbd.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "1074".to_string(),
-            },
-            title: "Red Dead Redemption 2".to_string(),
-            year: Some(2018),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co1q1f.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "11208".to_string(),
-            },
-            title: "Elden Ring".to_string(),
-            year: Some(2022),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co4jni.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "119171".to_string(),
-            },
-            title: "Baldur's Gate 3".to_string(),
-            year: Some(2023),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co5s5v.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "1877".to_string(),
-            },
-            title: "Cyberpunk 2077".to_string(),
-            year: Some(2020),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co2vt0.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "11156".to_string(),
-            },
-            title: "Sekiro: Shadows Die Twice".to_string(),
-            year: Some(2019),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co1ixg.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "113285".to_string(),
-            },
-            title: "Hades".to_string(),
-            year: Some(2020),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co2i0u.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "26192".to_string(),
-            },
-            title: "Celeste".to_string(),
-            year: Some(2018),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co1tnq.png".to_string()),
-            theme_music_url: None,
-        },
-        SearchResult {
-            provider_ref: ProviderRef {
-                provider_source: "igdb".to_string(),
-                provider_id: "25076".to_string(),
-            },
-            title: "Stardew Valley".to_string(),
-            year: Some(2016),
-            work_type: WorkType::Game,
-            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big/co5qkw.png".to_string()),
-            theme_music_url: None,
-        },
-    ]
-}
-
-// Search results with pagination
-#[allow(dead_code)]
-struct SearchResultsPage {
-    results: Vec<SearchResult>,
-    total_count: usize,
-    page: usize,
-    total_pages: usize,
-}
-
-// Extracted search function (will be replaced with API call in the future)
-fn search_works(query: &str, work_type: WorkType, page: usize) -> SearchResultsPage {
-    let page_size = 10;
-    let fixtures = get_fixture_search_results();
-
-    // Filter by work type and query
-    let filtered: Vec<SearchResult> = fixtures
-        .into_iter()
-        .filter(|r| {
-            if r.work_type != work_type {
-                return false;
-            }
-            if query.is_empty() {
-                true
-            } else {
-                r.title.to_lowercase().contains(&query.to_lowercase())
-            }
-        })
-        .collect();
-
-    let total_count = filtered.len();
-    let total_pages = (total_count as f32 / page_size as f32).ceil() as usize;
-    let start_idx = page * page_size;
-    let end_idx = (start_idx + page_size).min(total_count);
-
-    let results = if start_idx < total_count {
-        filtered[start_idx..end_idx].to_vec()
-    } else {
-        Vec::new()
-    };
-
-    SearchResultsPage {
-        results,
-        total_count,
-        page,
-        total_pages,
+    /// Add a new mnemon
+    fn add_mnemon(&mut self, mnemon: Mnemon) {
+        self.mnemons.write().push(mnemon);
     }
 }
 
-// Form data for adding a mnemon
+// =============================================================================
+// FORM DATA
+// =============================================================================
+
+/// Form data for adding a mnemon
 #[derive(Clone, PartialEq, Debug, Default)]
 struct AddMnemonForm {
     // Step 1 fields
@@ -592,164 +131,44 @@ impl AddMnemonForm {
     }
 }
 
-// Hardcoded sample data (kept for reference/testing)
-#[allow(dead_code)]
-fn get_sample_mnemons() -> Vec<Mnemon> {
-    vec![
-        Mnemon {
-            id: 1,
-            title: "Spirited Away".to_string(),
-            year: Some(2001),
-            work_type: WorkType::Movie,
-            cover_url: Some(
-                "https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg".to_string(),
-            ),
-            provider_ref: None,
-            feelings: vec![
-                "Nostalgic".to_string(),
-                "Wholesome".to_string(),
-                "Mysterious".to_string(),
-            ],
-            finished_date: Some("2023-08-15".to_string()),
-            notes: vec![
-                "Watched this again after 10 years. Still as magical as I remembered.".to_string(),
-                "The scene with the train over the water hits different now.".to_string(),
-                "Chihiro's growth throughout the story is so beautifully done.".to_string(),
-                "No-Face represents loneliness in such a profound way.".to_string(),
-            ],
-        },
-        Mnemon {
-            id: 2,
-            title: "The Legend of Zelda: Breath of the Wild".to_string(),
-            year: Some(2017),
-            work_type: WorkType::Game,
-            cover_url: Some(
-                "https://images.igdb.com/igdb/image/upload/t_cover_big/co3p2d.png".to_string(),
-            ),
-            provider_ref: None,
-            feelings: vec![
-                "Epic".to_string(),
-                "Adventurous".to_string(),
-                "Uplifting".to_string(),
-            ],
-            finished_date: Some("2024-01-20".to_string()),
-            notes: vec![
-                "120 hours of pure exploration. Every hill had something to discover.".to_string(),
-                "The final battle felt earned after everything.".to_string(),
-                "This game taught me that the journey matters more than the destination."
-                    .to_string(),
-                "Climbing in the rain became strangely meditative.".to_string(),
-            ],
-        },
-        Mnemon {
-            id: 3,
-            title: "Cowboy Bebop".to_string(),
-            year: Some(1998),
-            work_type: WorkType::TvAnime,
-            cover_url: Some(
-                "https://image.tmdb.org/t/p/w500/gZFHBd677gz8V5fyj8SZx5SrqTA.jpg".to_string(),
-            ),
-            provider_ref: None,
-            feelings: vec![
-                "Melancholic".to_string(),
-                "Chill".to_string(),
-                "Bittersweet".to_string(),
-            ],
-            finished_date: Some("2023-12-03".to_string()),
-            notes: vec![
-                "See you, space cowboy. That ending still haunts me.".to_string(),
-                "The jazz soundtrack is perfection. Each episode feels like a short film."
-                    .to_string(),
-                "Spike's past catching up to him felt inevitable and tragic.".to_string(),
-            ],
-        },
-        Mnemon {
-            id: 4,
-            title: "The Grand Budapest Hotel".to_string(),
-            year: Some(2014),
-            work_type: WorkType::Movie,
-            cover_url: Some(
-                "https://image.tmdb.org/t/p/w500/nX5XotM9yprCKarRH4fzOq1VM1J.jpg".to_string(),
-            ),
-            provider_ref: None,
-            feelings: vec![
-                "Cozy".to_string(),
-                "Wholesome".to_string(),
-                "Nostalgic".to_string(),
-            ],
-            finished_date: Some("2024-02-14".to_string()),
-            notes: vec![
-                "Wes Anderson's masterpiece. Every frame is a painting.".to_string(),
-                "The pastel colors and symmetry create a dreamlike world.".to_string(),
-                "M. Gustave is unforgettable. Ralph Fiennes at his best.".to_string(),
-            ],
-        },
-        Mnemon {
-            id: 5,
-            title: "Hollow Knight".to_string(),
-            year: Some(2017),
-            work_type: WorkType::Game,
-            cover_url: Some(
-                "https://images.igdb.com/igdb/image/upload/t_cover_big/co1rgi.png".to_string(),
-            ),
-            provider_ref: None,
-            feelings: vec![
-                "Somber".to_string(),
-                "Epic".to_string(),
-                "Mysterious".to_string(),
-            ],
-            finished_date: Some("2023-11-28".to_string()),
-            notes: vec![
-                "Defeated the Radiance after 60 hours. This game broke me and rebuilt me."
-                    .to_string(),
-                "The atmosphere is unmatched - haunting music, gorgeous hand-drawn art."
-                    .to_string(),
-                "Hallownest feels like a real place with its own history.".to_string(),
-                "Every boss taught me something about patience.".to_string(),
-            ],
-        },
-        Mnemon {
-            id: 6,
-            title: "Your Name".to_string(),
-            year: Some(2016),
-            work_type: WorkType::Movie,
-            cover_url: Some(
-                "https://image.tmdb.org/t/p/w500/q719jXXEzOoYaps6babgKnONONX.jpg".to_string(),
-            ),
-            provider_ref: None,
-            feelings: vec![
-                "Heartwarming".to_string(),
-                "Bittersweet".to_string(),
-                "Uplifting".to_string(),
-            ],
-            finished_date: Some("2024-03-01".to_string()),
-            notes: vec![
-                "Cried three times. The red string of fate made visual.".to_string(),
-                "RADWIMPS soundtrack is on repeat. Pure emotion in every track.".to_string(),
-                "That moment when they finally meet... perfect.".to_string(),
-                "The way time and memory intertwine is beautifully handled.".to_string(),
-            ],
-        },
-    ]
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/// Calculate reading time in milliseconds based on word count
+/// Average reading speed: ~4 words per second
+/// Returns a value between NOTE_MIN_READING_TIME_MS and NOTE_MAX_READING_TIME_MS
+fn calculate_reading_time(text: &str) -> u64 {
+    let word_count = text.split_whitespace().count();
+    let seconds = (word_count as f64 / WORDS_PER_SECOND).ceil() as u64;
+    let ms = seconds * 1000;
+    ms.clamp(NOTE_MIN_READING_TIME_MS, NOTE_MAX_READING_TIME_MS)
 }
+
+// =============================================================================
+// MAIN APP COMPONENT
+// =============================================================================
 
 #[component]
 fn App() -> Element {
-    // All mnemons - start with empty to show empty state
-    let mut mnemons = use_signal(|| Vec::<Mnemon>::new());
+    // Initialize application state
+    let app_state = use_signal(AppState::new);
 
-    // Provide mnemons to child components
-    use_context_provider(|| mnemons);
+    // Provide state to child components
+    use_context_provider(|| app_state);
 
-    // Current mnemon index
-    let mut current_index = use_signal(|| 0);
+    // Current mnemon index for hero display
+    let mut current_index = use_signal(|| 0usize);
     let mut is_transitioning = use_signal(|| false);
 
     // Add flow state
     let mut show_add_flow = use_signal(|| false);
 
-    let current_mnemon = use_memo(move || {
-        let all = mnemons();
+    // Get mnemons with works for display
+    let mnemons_with_works = use_memo(move || app_state().get_mnemons_with_works());
+
+    let current_mnemon_with_work = use_memo(move || {
+        let all = mnemons_with_works();
         if all.is_empty() {
             return None;
         }
@@ -757,34 +176,32 @@ fn App() -> Element {
         all.get(idx).cloned()
     });
 
-    // Auto-advance to next mnemon after 10 seconds (continuous cycle)
-    // This effect only runs once on mount to avoid creating multiple timers
+    // Auto-advance to next mnemon after HERO_AUTO_CYCLE_MS
     use_effect(move || {
         spawn(async move {
             loop {
-                gloo_timers::future::TimeoutFuture::new(10_000).await;
+                gloo_timers::future::TimeoutFuture::new(HERO_AUTO_CYCLE_MS).await;
 
-                // Check if we have mnemons before cycling
-                let total = mnemons.read().len();
+                let total = mnemons_with_works.read().len();
                 if total == 0 {
                     continue;
                 }
 
                 // Start transition (slide out to left)
                 is_transitioning.set(true);
-                gloo_timers::future::TimeoutFuture::new(600).await;
+                gloo_timers::future::TimeoutFuture::new(HERO_TRANSITION_MS).await;
 
                 // Switch mnemon
                 current_index.with_mut(|idx| *idx = (*idx + 1) % total);
 
-                // End transition (slide in from right)
-                gloo_timers::future::TimeoutFuture::new(50).await;
+                // End transition
+                gloo_timers::future::TimeoutFuture::new(HERO_TRANSITION_SETTLE_MS).await;
                 is_transitioning.set(false);
             }
         });
     });
 
-    let has_mnemons = !mnemons().is_empty();
+    let has_mnemons = !mnemons_with_works().is_empty();
 
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
@@ -794,11 +211,10 @@ fn App() -> Element {
         div {
             class: "h-screen w-screen overflow-hidden bg-gray-900",
 
-            // Hero with current mnemon or empty state
             if has_mnemons {
-                if let Some(mnemon) = current_mnemon() {
+                if let Some(mnemon_with_work) = current_mnemon_with_work() {
                     Hero {
-                        mnemon: mnemon.clone(),
+                        mnemon_with_work: mnemon_with_work.clone(),
                         is_transitioning: is_transitioning(),
                         on_click: move |_| {
                             show_add_flow.set(true);
@@ -813,44 +229,65 @@ fn App() -> Element {
                 }
             }
 
-            // Add mnemon flow (modal overlay)
             if show_add_flow() {
                 AddMnemonFlow {
                     on_save: move |form: AddMnemonForm| {
-                        let mut all_mnemons = mnemons.write();
-                        let new_id = all_mnemons.len() + 1;
+                        let mut state = app_state();
 
                         // Parse year
                         let year = form.year.trim().parse::<u16>().ok();
 
+                        // Create or reuse Work
+                        let work_id = if let Some(ref provider_ref) = form.provider_ref {
+                            // Check if work already exists
+                            if let Some(existing_work) = state.find_work_by_provider_ref(provider_ref) {
+                                info!("Reusing existing work: {}", existing_work.title_en);
+                                existing_work.id
+                            } else {
+                                // Create new work from provider
+                                let work = Work::from_provider(
+                                    form.work_type.clone().unwrap(),
+                                    form.title.clone(),
+                                    year,
+                                    form.cover_url.clone(),
+                                    form.theme_music_url.clone(),
+                                    provider_ref.clone(),
+                                );
+                                info!("Created new work from provider: {}", work.title_en);
+                                state.add_work(work)
+                            }
+                        } else {
+                            // Create manual work
+                            let work = Work::from_manual(
+                                form.work_type.clone().unwrap(),
+                                form.title.clone(),
+                                year,
+                            );
+                            info!("Created manual work: {}", work.title_en);
+                            state.add_work(work)
+                        };
+
                         // Split notes by newlines
-                        let notes: Vec<String> = form.notes
+                        let notes: Vec<String> = form
+                            .notes
                             .lines()
                             .map(|s| s.trim().to_string())
                             .filter(|s| !s.is_empty())
                             .collect();
 
-                        let new_mnemon = Mnemon {
-                            id: new_id,
-                            title: form.title.clone(),
-                            year,
-                            work_type: form.work_type.unwrap(),
-                            cover_url: form.cover_url.clone(),
-                            provider_ref: form.provider_ref.clone(),
-                            feelings: form.feelings.clone(),
-                            finished_date: if form.finished_date.is_empty() {
-                                None
-                            } else {
-                                Some(form.finished_date.clone())
-                            },
-                            notes,
+                        // Create mnemon
+                        let finished_date = if form.finished_date.is_empty() {
+                            None
+                        } else {
+                            Some(form.finished_date.clone())
                         };
 
-                        all_mnemons.push(new_mnemon);
-                        let new_index = all_mnemons.len() - 1;
-                        drop(all_mnemons);
+                        let mnemon = Mnemon::new(work_id, finished_date, form.feelings.clone(), notes);
+                        info!("Created new mnemon for work_id: {}", work_id);
+                        state.add_mnemon(mnemon);
 
                         // Set current index to the new mnemon
+                        let new_index = state.get_mnemons_with_works().len() - 1;
                         current_index.set(new_index);
 
                         show_add_flow.set(false);
@@ -864,31 +301,37 @@ fn App() -> Element {
     }
 }
 
-// Calculate reading time in milliseconds based on word count
-// Average reading speed: ~250 words per minute = ~4 words per second
-// Minimum 3 seconds, maximum 8 seconds
-fn calculate_reading_time(text: &str) -> u64 {
-    let word_count = text.split_whitespace().count();
-    let seconds = (word_count as f64 / 4.0).ceil() as u64;
-    (seconds.max(3).min(8)) * 1000
-}
+// =============================================================================
+// HERO COMPONENT
+// =============================================================================
 
 #[component]
-fn Hero(mnemon: ReadSignal<Mnemon>, is_transitioning: bool, on_click: EventHandler<()>) -> Element {
+fn Hero(
+    mnemon_with_work: MnemonWithWork,
+    is_transitioning: bool,
+    on_click: EventHandler<()>,
+) -> Element {
     use rand::seq::SliceRandom;
     use rand::thread_rng;
 
+    let work = mnemon_with_work.work.clone();
+    let mnemon = mnemon_with_work.mnemon.clone();
+
     // Current note index
-    let mut current_note_index = use_signal(|| 0);
+    let mut current_note_index = use_signal(|| 0usize);
     let mut note_visible = use_signal(|| true);
 
     // Selected notes - updates when mnemon changes
+    let mnemon_notes = mnemon.notes.clone();
     let selected_notes = use_memo(move || {
         let mut rng = thread_rng();
-        let mut notes = mnemon().notes.clone();
+        let mut notes = mnemon_notes.clone();
         notes.shuffle(&mut rng);
         current_note_index.set(0);
-        notes.into_iter().take(2).collect::<Vec<String>>()
+        notes
+            .into_iter()
+            .take(HERO_NOTES_TO_DISPLAY)
+            .collect::<Vec<String>>()
     });
 
     // Rotate through notes with fade animation
@@ -908,7 +351,7 @@ fn Hero(mnemon: ReadSignal<Mnemon>, is_transitioning: bool, on_click: EventHandl
 
             // Fade out
             note_visible.set(false);
-            gloo_timers::future::TimeoutFuture::new(500).await;
+            gloo_timers::future::TimeoutFuture::new(NOTE_FADE_TRANSITION_MS).await;
 
             // Switch to next note
             let next_idx = (idx + 1) % notes.len();
@@ -926,9 +369,15 @@ fn Hero(mnemon: ReadSignal<Mnemon>, is_transitioning: bool, on_click: EventHandl
     });
 
     let transition_style = if is_transitioning {
-        "transform: translateX(-100%); transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);"
+        format!(
+            "transform: translateX(-100%); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);",
+            HERO_TRANSITION_MS
+        )
     } else {
-        "transform: translateX(0); transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);"
+        format!(
+            "transform: translateX(0); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);",
+            HERO_TRANSITION_MS
+        )
     };
 
     rsx! {
@@ -940,7 +389,7 @@ fn Hero(mnemon: ReadSignal<Mnemon>, is_transitioning: bool, on_click: EventHandl
             // Background cover image with overlay
             div {
                 class: "absolute inset-0 z-0",
-                style: if let Some(ref url) = mnemon().cover_url {
+                style: if let Some(ref url) = work.cover_image_local_uri {
                     format!("background-image: url('{}'); background-size: cover; background-position: center; background-repeat: no-repeat;", url)
                 } else {
                     "background-color: #1a1a2e;".to_string()
@@ -977,19 +426,19 @@ fn Hero(mnemon: ReadSignal<Mnemon>, is_transitioning: bool, on_click: EventHandl
                         class: "flex items-center gap-3 mb-3",
                         span {
                             class: "text-2xl opacity-90",
-                            "{mnemon().work_type.icon()}"
+                            "{work.work_type.icon()}"
                         }
                         h1 {
                             class: "text-2xl font-semibold text-white/95",
-                            "{mnemon().title}"
+                            "{work.title_en}"
                         }
                     }
 
                     // Feelings
-                    if !mnemon().feelings.is_empty() {
+                    if !mnemon_with_work.mnemon.feelings.is_empty() {
                         div {
                             class: "flex flex-wrap gap-2",
-                            for feeling in mnemon().feelings.iter() {
+                            for feeling in mnemon_with_work.mnemon.feelings.iter() {
                                 span {
                                     class: "px-3 py-1 bg-white/15 backdrop-blur-sm text-white/90 text-sm rounded-full border border-white/20",
                                     "{feeling}"
@@ -1002,6 +451,10 @@ fn Hero(mnemon: ReadSignal<Mnemon>, is_transitioning: bool, on_click: EventHandl
         }
     }
 }
+
+// =============================================================================
+// EMPTY STATE COMPONENT
+// =============================================================================
 
 #[component]
 fn EmptyState(on_click: EventHandler<()>) -> Element {
@@ -1032,9 +485,13 @@ fn EmptyState(on_click: EventHandler<()>) -> Element {
     }
 }
 
+// =============================================================================
+// ADD MNEMON FLOW
+// =============================================================================
+
 #[component]
 fn AddMnemonFlow(on_save: EventHandler<AddMnemonForm>, on_cancel: EventHandler<()>) -> Element {
-    let mut form = use_signal(|| AddMnemonForm::default());
+    let mut form = use_signal(AddMnemonForm::default);
     let mut current_step = use_signal(|| 1);
 
     rsx! {
@@ -1074,6 +531,10 @@ fn AddMnemonFlow(on_save: EventHandler<AddMnemonForm>, on_cancel: EventHandler<(
     }
 }
 
+// =============================================================================
+// STEP 1: PICK THE WORK
+// =============================================================================
+
 #[component]
 fn Step1ManualEntry(
     form: AddMnemonForm,
@@ -1081,39 +542,16 @@ fn Step1ManualEntry(
     on_cancel: EventHandler<()>,
 ) -> Element {
     let mut local_form = use_signal(|| form);
-    let mut search_results = use_signal(|| Vec::<SearchResult>::new());
+    let mut search_results = use_signal(Vec::<SearchResult>::new);
     let mut show_results = use_signal(|| false);
     let mut existing_work_error = use_signal(|| false);
-    let mnemons = use_context::<Signal<Vec<Mnemon>>>();
+    let app_state = use_context::<Signal<AppState>>();
 
     let is_valid = local_form().is_step1_valid() && !existing_work_error();
-    let mut current_page = use_signal(|| 0usize);
-
-    // Search function (will call API in the future)
-    let mut perform_search =
-        move |query: String, work_type: Option<WorkType>, force: bool, page: usize| {
-            if let Some(wt) = work_type {
-                if force || query.len() >= 3 || query.is_empty() {
-                    let results_page = search_works(&query, wt, page);
-                    search_results.set(results_page.results);
-                    show_results.set(true);
-                } else {
-                    search_results.set(Vec::new());
-                    show_results.set(false);
-                }
-            }
-        };
 
     // Check if provider ref already exists
     let check_existing_work = move |provider_ref: &ProviderRef| -> bool {
-        mnemons.read().iter().any(|m| {
-            if let Some(ref pr) = m.provider_ref {
-                pr.provider_source == provider_ref.provider_source
-                    && pr.provider_id == provider_ref.provider_id
-            } else {
-                false
-            }
-        })
+        app_state().has_mnemon_for_provider_ref(provider_ref)
     };
 
     rsx! {
@@ -1151,7 +589,7 @@ fn Step1ManualEntry(
                                 "flex items-center gap-2 px-4 py-3 bg-gray-700 text-gray-300 rounded-lg border-2 border-gray-600 hover:border-gray-500 font-medium"
                             },
                             onclick: move |_| {
-                                info!("[DEBUG] Type selected: {}", work_type.label());
+                                info!("Type selected: {}", work_type.label());
                                 local_form.with_mut(|f| {
                                     f.work_type = Some(work_type.clone());
                                     // Clear provider data when changing type
@@ -1160,9 +598,6 @@ fn Step1ManualEntry(
                                     f.theme_music_url = None;
                                 });
                                 existing_work_error.set(false);
-                                current_page.set(0);
-                                info!("[DEBUG] Type changed - cleared provider data");
-                                // Don't trigger search on type selection
                             },
                             span { class: "text-xl", "{work_type.icon()}" }
                             span { "{work_type.label()}" }
@@ -1190,12 +625,15 @@ fn Step1ManualEntry(
                     value: "{local_form().title}",
                     disabled: local_form().work_type.is_none(),
                     onfocus: move |_| {
-                        // Trigger search when field is focused
-                        info!("[DEBUG] Title field focused");
-                        if local_form().work_type.is_some() {
-                            current_page.set(0);
-                            perform_search(local_form().title.clone(), local_form().work_type.clone(), false, 0);
-                            info!("[DEBUG] Search triggered on focus");
+                        info!("Title field focused");
+                        if let Some(ref wt) = local_form().work_type {
+                            let query = local_form().title.clone();
+                            if query.len() >= SEARCH_MIN_CHARS || query.is_empty() {
+                                let results_page = search_works(&query, wt.clone(), 0);
+                                info!("Search on focus for '{}': {} results", query, results_page.results.len());
+                                search_results.set(results_page.results);
+                                show_results.set(true);
+                            }
                         }
                     },
                     onblur: move |_| {
@@ -1212,14 +650,28 @@ fn Step1ManualEntry(
                             f.year = String::new();
                         });
                         existing_work_error.set(false);
-                        current_page.set(0);
-                        perform_search(value, local_form().work_type.clone(), false, 0);
+                        // Perform search
+                        if let Some(ref wt) = local_form().work_type {
+                            if value.len() >= SEARCH_MIN_CHARS || value.is_empty() {
+                                let results_page = search_works(&value, wt.clone(), 0);
+                                search_results.set(results_page.results);
+                                show_results.set(true);
+                            } else {
+                                search_results.set(Vec::new());
+                                show_results.set(false);
+                            }
+                        }
                     },
                     onkeydown: move |e| {
                         if e.key() == Key::Enter {
-                            // Force search on Enter regardless of length
-                            current_page.set(0);
-                            perform_search(local_form().title.clone(), local_form().work_type.clone(), true, 0);
+                            // Force search on Enter regardless of query length
+                            if let Some(ref wt) = local_form().work_type {
+                                let query = local_form().title.clone();
+                                let results_page = search_works(&query, wt.clone(), 0);
+                                info!("Search on Enter for '{}': {} results", query, results_page.results.len());
+                                search_results.set(results_page.results);
+                                show_results.set(true);
+                            }
                         }
                     }
                 }
@@ -1231,18 +683,19 @@ fn Step1ManualEntry(
                         for result in search_results().iter() {
                             button {
                                 class: "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-600 border-b border-gray-600 last:border-b-0 text-left",
-                                onclick: {
+                                // Use onmousedown instead of onclick to fire before the input's onblur
+                                onmousedown: {
                                     let result_clone = result.clone();
-                                    move |_| {
-                                        web_sys::console::log_1(&format!("[DEBUG] Result clicked: {}", result_clone.title).into());
-                                        // Check if work already exists
+                                    move |e: MouseEvent| {
+                                        e.prevent_default();
+                                        info!("Result selected: {}", result_clone.title);
+
                                         if check_existing_work(&result_clone.provider_ref) {
-                                            web_sys::console::log_1(&"[DEBUG] Work already exists - showing error".into());
+                                            info!("Work already has a mnemon - showing error");
                                             existing_work_error.set(true);
                                             show_results.set(false);
                                         } else {
-                                            web_sys::console::log_1(&"[DEBUG] Autofilling form with result".into());
-                                            // Autofill form with provider result
+                                            info!("Autofilling form with result");
                                             local_form.with_mut(|f| {
                                                 f.title = result_clone.title.clone();
                                                 f.year = result_clone.year.map(|y| y.to_string()).unwrap_or_default();
@@ -1252,7 +705,6 @@ fn Step1ManualEntry(
                                             });
                                             existing_work_error.set(false);
                                             show_results.set(false);
-                                            web_sys::console::log_1(&"[DEBUG] Form autofilled, dropdown closed".into());
                                         }
                                     }
                                 },
@@ -1321,7 +773,7 @@ fn Step1ManualEntry(
                 label {
                     class: "block text-white text-sm font-semibold mb-3",
                     "Feelings"
-                    span { class: "text-gray-400 ml-2 text-xs", "(choose up to 5)" }
+                    span { class: "text-gray-400 ml-2 text-xs", "(choose up to {MAX_FEELINGS})" }
                 }
                 div {
                     class: "flex flex-wrap gap-2",
@@ -1329,7 +781,7 @@ fn Step1ManualEntry(
                         {
                             let is_selected = local_form().feelings.contains(&feeling_name.to_string());
                             let feelings_count = local_form().feelings.len();
-                            let can_add = feelings_count < 5;
+                            let can_add = feelings_count < MAX_FEELINGS;
 
                             rsx! {
                                 button {
@@ -1386,6 +838,10 @@ fn Step1ManualEntry(
     }
 }
 
+// =============================================================================
+// STEP 2: PERSONALIZE
+// =============================================================================
+
 #[component]
 fn Step2Personalize(
     form: AddMnemonForm,
@@ -1441,7 +897,7 @@ fn Step2Personalize(
                 }
             }
 
-            // Finished date (when you finished/completed it)
+            // Finished date
             div {
                 class: "mb-8",
                 label {

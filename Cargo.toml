@@ -7,14 +7,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dioxus = { version = "0.7.1", features = ["router", "fullstack"] }
+dioxus = { version = "0.7.1", features = ["router"] }
 rand = "0.8"
 gloo-timers = { version = "0.3", features = ["futures"] }
 getrandom = { version = "0.2", features = ["js"] }
-web-sys = { version = "0.3.82", features = ["console"] }
+uuid = { version = "1.11", features = ["v4", "js"] }
+chrono = { version = "0.4", features = ["wasmbind"] }
+tracing = "0.1"
 
 [features]
 default = ["web"]
 web = ["dioxus/web"]
+web-fullstack = ["dioxus/web", "dioxus/fullstack"]
 desktop = ["dioxus/desktop"]
 mobile = ["dioxus/mobile"]
