@@ -215,6 +215,7 @@ fn App() -> Element {
             if has_mnemons {
                 if let Some(mnemon_with_work) = current_mnemon_with_work() {
                     Hero {
+                        key: "{mnemon_with_work.mnemon.id}",
                         mnemon_with_work: mnemon_with_work.clone(),
                         is_transitioning: is_transitioning(),
                         on_click: move |_| {

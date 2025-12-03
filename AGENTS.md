@@ -10,3 +10,5 @@ These are the md files that you should read:
 If you are implementing a design feature, follow the guidelines in the WIREFRAMES.md file.
 
 At the beginning of each phase ask questions if you are unsure about the requirements or implementation details.
+
+Assume I'm always running `dx serve`, no need to run `dx build`, `cargo check` is enough.
