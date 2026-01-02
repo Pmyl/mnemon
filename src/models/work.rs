@@ -1,10 +1,11 @@
 //! Work model - represents a piece of media (Movie, TV/Anime, or Game)
 
 use super::ProviderRef;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// The type of media work
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum WorkType {
     Movie,
     TvAnime,
@@ -32,7 +33,7 @@ impl WorkType {
 }
 
 /// Origin of the work data
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum WorkOrigin {
     /// Work was created from a provider search result
     Provider,
@@ -44,7 +45,7 @@ pub enum WorkOrigin {
 ///
 /// Works are the media entities that Mnemons reference. A Work can be shared
 /// across multiple Mnemons (e.g., if you watch the same movie twice).
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Work {
     /// Unique identifier (UUID)
     pub id: Uuid,

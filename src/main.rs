@@ -8,14 +8,21 @@ mod constants;
 mod data;
 mod models;
 mod providers;
+mod storage;
 
 use constants::*;
 use data::{SearchService, SearchStatus};
 use models::*;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
-const MAIN_CSS: Asset = asset!("/assets/main.css");
-const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
+const MAIN_CSS: Asset = asset!(
+    "/assets/main.css",
+    AssetOptions::css().with_static_head(true)
+);
+const TAILWIND_CSS: Asset = asset!(
+    "/assets/tailwind.css",
+    AssetOptions::css().with_static_head(true)
+);
 
 fn main() {
     dioxus::launch(App);
@@ -38,6 +45,8 @@ struct MnemonWithWork {
 struct AppState {
     works: Signal<Vec<Work>>,
     mnemons: Signal<Vec<Mnemon>>,
+    /// Whether initial data has been loaded from storage
+    loaded: Signal<bool>,
 }
 
 impl AppState {
@@ -45,7 +54,27 @@ impl AppState {
         Self {
             works: Signal::new(Vec::new()),
             mnemons: Signal::new(Vec::new()),
+            loaded: Signal::new(false),
         }
+    }
+
+    /// Load data from IndexedDB storage (async)
+    async fn load_from_storage(&mut self) {
+        let persisted = storage::load_all_async().await;
+        info!(
+            "Loaded {} works and {} mnemons from IndexedDB",
+            persisted.works.len(),
+            persisted.mnemons.len()
+        );
+
+        self.works.set(persisted.works);
+        self.mnemons.set(persisted.mnemons);
+        self.loaded.set(true);
+    }
+
+    /// Check if data has been loaded from storage
+    fn is_loaded(&self) -> bool {
+        *self.loaded.read()
     }
 
     /// Get all mnemons with their associated works
@@ -93,13 +122,30 @@ impl AppState {
     /// Add a new work and return its ID
     fn add_work(&mut self, work: Work) -> Uuid {
         let id = work.id;
+        let work_clone = work.clone();
         self.works.write().push(work);
+
+        // Persist asynchronously
+        spawn(async move {
+            if let Err(e) = storage::save_work(&work_clone).await {
+                info!("Failed to persist work: {}", e);
+            }
+        });
+
         id
     }
 
     /// Add a new mnemon
     fn add_mnemon(&mut self, mnemon: Mnemon) {
+        let mnemon_clone = mnemon.clone();
         self.mnemons.write().push(mnemon);
+
+        // Persist asynchronously
+        spawn(async move {
+            if let Err(e) = storage::save_mnemon(&mnemon_clone).await {
+                info!("Failed to persist mnemon: {}", e);
+            }
+        });
     }
 }
 
@@ -153,10 +199,19 @@ fn calculate_reading_time(text: &str) -> u64 {
 #[component]
 fn App() -> Element {
     // Initialize application state
-    let app_state = use_signal(AppState::new);
+    let mut app_state = use_signal(AppState::new);
 
     // Provide state to child components
     use_context_provider(|| app_state);
+
+    // Load data from IndexedDB on mount
+    use_effect(move || {
+        if !app_state().is_loaded() {
+            spawn(async move {
+                app_state.write().load_from_storage().await;
+            });
+        }
+    });
 
     // Current mnemon index for hero display
     let mut current_index = use_signal(|| 0usize);
@@ -203,6 +258,7 @@ fn App() -> Element {
     });
 
     let has_mnemons = !mnemons_with_works().is_empty();
+    let is_loaded = app_state().is_loaded();
 
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
@@ -212,7 +268,8 @@ fn App() -> Element {
         div {
             class: "h-screen w-screen overflow-hidden bg-gray-900",
 
-            if has_mnemons {
+            // Show loading state until IndexedDB data is loaded
+            if is_loaded && has_mnemons {
                 if let Some(mnemon_with_work) = current_mnemon_with_work() {
                     Hero {
                         key: "{mnemon_with_work.mnemon.id}",
@@ -223,7 +280,7 @@ fn App() -> Element {
                         }
                     }
                 }
-            } else {
+            } else if is_loaded {
                 EmptyState {
                     on_click: move |_| {
                         show_add_flow.set(true);

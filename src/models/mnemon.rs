@@ -1,12 +1,13 @@
 //! Mnemon model - a user-created memory referencing a Work
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// A user-created memory referencing exactly one Work
 ///
 /// Mnemons capture personal memories and feelings about a piece of media.
 /// All personal fields are optional - this is not a tracking app.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Mnemon {
     /// Unique identifier (UUID)
     pub id: Uuid,

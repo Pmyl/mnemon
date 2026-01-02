@@ -1,10 +1,12 @@
 //! Provider reference model
 
+use serde::{Deserialize, Serialize};
+
 /// Reference to a work in an external provider (e.g., TMDB, AniList, IGDB)
 ///
 /// Used for exact-ID deduplication: if two works have the same provider_source
 /// and provider_id, they are considered the same work.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ProviderRef {
     /// The source provider (e.g., "tmdb", "anilist", "igdb")
     pub provider_source: String,
