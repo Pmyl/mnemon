@@ -34,31 +34,35 @@ This document is the evolving build plan for Mnemon's MVP, grounded in `PROJECT.
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
 | **Step 6 — Web persistence (IndexedDB)** ✅ | Persist Works/Mnemons/assets metadata for the web target. | In web build, mnemons survive page reloads; empty state returns only when storage cleared. Manual entries still surface in hero and details after reload. | Step 5 |
-| **Step 7 — Mobile persistence (iOS/Android)** | Add mobile storage adapters using native filesystem APIs for iPhone and Android apps. | Mobile builds persist mnemons across app restarts; data stored in app-specific storage directories. | Step 6 |
 
 ## Phase 5 — Read-only Details & Audio Stub
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 8 — Memory Details view with audio controls (stub)** | Render Details route, share components for feelings/notes, and wire a stubbed audio controller. | Selecting "Open Memory" shows read-only detail screen with placeholder cover/audio player that reacts to play/stop in UI (no actual audio yet). | Step 7 |
+| **Step 7 — Memory Details view with audio controls (stub)** | Render Details route, share components for feelings/notes, and wire a stubbed audio controller. | Selecting "Open Memory" shows read-only detail screen with placeholder cover/audio player that reacts to play/stop in UI (no actual audio yet). | Step 6 |
 
 ## Phase 6 — GitHub Pages Deployment & User Token Configuration
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 9 — GitHub Actions workflow for static deployment** | Create CI/CD pipeline to build and deploy the web app to GitHub Pages. | Push to main triggers automated build; site is live at `https://<user>.github.io/mnemon/` with all static assets served correctly. | Step 8 |
-| **Step 10 — Settings UI for API token configuration** | Add a Settings page/modal where users can input their own TMDB and RAWG API keys, stored in localStorage. | Users can open Settings, enter API tokens, save them; tokens persist across sessions and are used for provider searches instead of compile-time env vars. | Step 9 |
-| **Step 11 — Runtime token loading** | Refactor provider clients to read tokens from localStorage at runtime instead of compile-time env vars. | App works on GitHub Pages with user-provided tokens; shows configuration prompts when tokens missing; seamless fallback to manual entry. | Step 10 |
+| **Step 8 — GitHub Actions workflow for static deployment** | Create CI/CD pipeline to build and deploy the web app to GitHub Pages. | Push to main triggers automated build; site is live at `https://<user>.github.io/mnemon/` with all static assets served correctly. | Step 7 |
+| **Step 9 — Settings UI for API token configuration** | Add a Settings page/modal where users can input their own TMDB and RAWG API keys, stored in localStorage. | Users can open Settings, enter API tokens, save them; tokens persist across sessions and are used for provider searches instead of compile-time env vars. | Step 8 |
+| **Step 10 — Runtime token loading** | Refactor provider clients to read tokens from localStorage at runtime instead of compile-time env vars. | App works on GitHub Pages with user-provided tokens; shows configuration prompts when tokens missing; seamless fallback to manual entry. | Step 9 |
 
 ## Phase 7 — Asset Caching & Audio Playback
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 12 — Cover and theme caching pipeline** | Fetch and persist cover/music assets, updating Works with local URIs. | After saving a provider-backed mnemon, cover art appears in hero/details; audio play button streams cached preview when available; placeholders show when assets missing. | Step 11 |
-| **Step 13 — Surprise hero audio behavior** | Enforce autoplay policy, stop-on-switch, and Play fallback per MVP rules. | Hero auto-plays when platform allows, otherwise surfaces a Play control; switching memories stops previous audio and (re)autoplays subject to policy. | Step 12 |
+| **Step 11 — Cover and theme caching pipeline** | Fetch and persist cover/music assets, updating Works with local URIs. | After saving a provider-backed mnemon, cover art appears in hero/details; audio play button streams cached preview when available; placeholders show when assets missing. | Step 10 |
+| **Step 12 — Surprise hero audio behavior** | Enforce autoplay policy, stop-on-switch, and Play fallback per MVP rules. | Hero auto-plays when platform allows, otherwise surfaces a Play control; switching memories stops previous audio and (re)autoplays subject to policy. | Step 11 |
 
 ## Phase 8 — Offline Guarantees & Refinement
 | Step | Goal | Reviewable Outcome | Dependencies |
 | --- | --- | --- | --- |
-| **Step 14 — Offline resilience audit** | Validate offline flows, add UX cues, and document limitations. | Demonstrated walkthrough (web & desktop) showing manual entry offline, existing mnemons surfacing with cached assets, and copy guiding offline behavior. | Step 13 |
-| **Step 15 — Quality hardening & release playbook** | Polish code/tests/docs and produce release artifacts. | Clean `cargo fmt/clippy/test` runs, migration of duplicated docs into rustdoc, generated web bundle & desktop binaries with deployment checklist. | Step 14 |
+| **Step 13 — Offline resilience audit** | Validate offline flows, add UX cues, and document limitations. | Demonstrated walkthrough (web & desktop) showing manual entry offline, existing mnemons surfacing with cached assets, and copy guiding offline behavior. | Step 12 |
+| **Step 14 — Quality hardening & release playbook** | Polish code/tests/docs and produce release artifacts. | Clean `cargo fmt/clippy/test` runs, migration of duplicated docs into rustdoc, generated web bundle & desktop binaries with deployment checklist. | Step 13 |
+
+## Phase 9 — Mobile Persistence
+| Step | Goal | Reviewable Outcome | Dependencies |
+| --- | --- | --- | --- |
+| **Step 15 — Mobile persistence (iOS/Android)** | Add mobile storage adapters using native filesystem APIs for iPhone and Android apps. | Mobile builds persist mnemons across app restarts; data stored in app-specific storage directories. | Step 14 |
 
 ## Review & Feedback Log
 | Revision | Reviewer Notes | Plan Adjustments |
