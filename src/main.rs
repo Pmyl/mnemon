@@ -178,6 +178,61 @@ impl AppState {
 
         shuffled_position
     }
+
+    /// Remove a mnemon from memory (does not delete from storage yet)
+    /// Returns the removed mnemon and its original index for potential restore
+    fn remove_mnemon(&mut self, mnemon_id: Uuid) -> Option<(Mnemon, usize)> {
+        let mut mnemons = self.mnemons.write();
+        let mut indices = self.shuffled_indices.write();
+
+        // Find the mnemon's position in the mnemons vec
+        let mnemon_idx = mnemons.iter().position(|m| m.id == mnemon_id)?;
+        let mnemon = mnemons.remove(mnemon_idx);
+
+        // Remove from shuffled_indices and update indices that pointed to higher positions
+        let shuffled_pos = indices.iter().position(|&i| i == mnemon_idx)?;
+        indices.remove(shuffled_pos);
+
+        // Update all indices that were greater than the removed index
+        for idx in indices.iter_mut() {
+            if *idx > mnemon_idx {
+                *idx -= 1;
+            }
+        }
+
+        info!("Removed mnemon {} from memory", mnemon_id);
+        Some((mnemon, mnemon_idx))
+    }
+
+    /// Restore a previously removed mnemon
+    fn restore_mnemon(&mut self, mnemon: Mnemon, original_idx: usize) {
+        let mut mnemons = self.mnemons.write();
+        let mut indices = self.shuffled_indices.write();
+
+        // Update all indices that are >= original_idx
+        for idx in indices.iter_mut() {
+            if *idx >= original_idx {
+                *idx += 1;
+            }
+        }
+
+        // Insert mnemon back at original position
+        mnemons.insert(original_idx, mnemon.clone());
+
+        // Add the index back to shuffled_indices (at the beginning so user sees it)
+        indices.insert(0, original_idx);
+
+        info!("Restored mnemon {}", mnemon.id);
+    }
+
+    /// Permanently delete a mnemon from storage
+    fn delete_mnemon_from_storage(mnemon_id: Uuid) {
+        spawn(async move {
+            if let Err(e) = storage::delete_mnemon(&mnemon_id).await {
+                info!("Failed to delete mnemon from storage: {}", e);
+            }
+        });
+    }
 }
 
 // =============================================================================
@@ -257,6 +312,9 @@ fn App() -> Element {
 
     // Add flow state
     let mut show_add_flow = use_signal(|| false);
+
+    // Pending delete state for undo functionality
+    let mut pending_delete: Signal<Option<PendingDelete>> = use_signal(|| None);
 
     // Get mnemons with works for display (in original order, indexed by shuffled_indices)
     let mnemons_with_works = use_memo(move || app_state.read().get_mnemons_with_works());
@@ -338,6 +396,20 @@ fn App() -> Element {
                         },
                         on_details_toggle: move |_| {
                             details_open.toggle();
+                        },
+                        on_delete: move |mnemon_id: Uuid| {
+                            // Remove from memory and store for potential undo
+                            let removed = app_state.write().remove_mnemon(mnemon_id);
+                            if let Some((mnemon, original_idx)) = removed {
+                                pending_delete.set(Some(PendingDelete { mnemon, original_idx }));
+                                // Close details view
+                                details_open.set(false);
+                                // Adjust current index if needed
+                                let total = app_state.peek().mnemons_count();
+                                if total > 0 && current_index() >= total {
+                                    current_index.set(total - 1);
+                                }
+                            }
                         }
                     }
                 }
@@ -420,7 +492,27 @@ fn App() -> Element {
                     }
                 }
             }
+
+            // Undo toast for pending deletions
+            if let Some(_pending) = pending_delete() {
+                UndoToast {
+                    message: "Memory deleted".to_string(),
+                    on_undo: move |_| {
+                        if let Some(pending) = pending_delete.take() {
+                            app_state.write().restore_mnemon(pending.mnemon, pending.original_idx);
+                            // Set index to 0 to show restored mnemon
+                            current_index.set(0);
+                        }
+                    },
+                    on_timeout: move |_| {
+                        if let Some(pending) = pending_delete.take() {
+                            // Permanently delete from storage
+                            AppState::delete_mnemon_from_storage(pending.mnemon.id);
+                        }
+                    }
+                }
             }
+        }
         }
     }
 }
@@ -436,6 +528,7 @@ fn Hero(
     details_open: bool,
     on_add_click: EventHandler<()>,
     on_details_toggle: EventHandler<()>,
+    on_delete: EventHandler<Uuid>,
 ) -> Element {
     use rand::seq::SliceRandom;
     use rand::thread_rng;
@@ -632,6 +725,79 @@ fn Hero(
 
                     MemoryDetails {
                         mnemon_with_work: mnemon_with_work.clone(),
+                        on_delete: on_delete,
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// UNDO TOAST COMPONENT
+// =============================================================================
+
+/// Data for a pending deletion that can be undone
+#[derive(Clone, PartialEq, Debug)]
+struct PendingDelete {
+    mnemon: Mnemon,
+    original_idx: usize,
+}
+
+/// Update interval for undo toast progress bar (ms)
+const UNDO_PROGRESS_INTERVAL_MS: u32 = 50;
+
+#[component]
+fn UndoToast(message: String, on_undo: EventHandler<()>, on_timeout: EventHandler<()>) -> Element {
+    let mut progress = use_signal(|| 100.0f64);
+
+    // Animate progress bar and handle timeout using gloo_timers
+    use_effect(move || {
+        spawn(async move {
+            let steps = UNDO_TIMEOUT_MS / UNDO_PROGRESS_INTERVAL_MS;
+            let decrement = 100.0 / steps as f64;
+
+            for _ in 0..steps {
+                gloo_timers::future::TimeoutFuture::new(UNDO_PROGRESS_INTERVAL_MS).await;
+                progress.with_mut(|p| *p -= decrement);
+            }
+
+            on_timeout.call(());
+        });
+    });
+
+    let progress_width = progress();
+
+    rsx! {
+        div {
+            class: "fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50",
+
+            div {
+                class: "bg-gray-800 border border-white/20 rounded-lg shadow-2xl overflow-hidden min-w-80",
+
+                // Content
+                div {
+                    class: "px-4 py-3 flex items-center justify-between gap-4",
+
+                    span {
+                        class: "text-white/90",
+                        "{message}"
+                    }
+
+                    button {
+                        class: "px-4 py-1 bg-white/20 hover:bg-white/30 text-white rounded transition-colors font-medium",
+                        onclick: move |_| on_undo.call(()),
+                        "Undo"
+                    }
+                }
+
+                // Progress bar (depletes from right to left)
+                div {
+                    class: "h-1 bg-white/10",
+
+                    div {
+                        class: "h-full bg-red-500",
+                        style: "width: {progress_width}%;",
                     }
                 }
             }
@@ -644,16 +810,17 @@ fn Hero(
 // =============================================================================
 
 #[component]
-fn MemoryDetails(mnemon_with_work: MnemonWithWork) -> Element {
+fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_delete: EventHandler<Uuid>) -> Element {
     let work = &mnemon_with_work.work;
     let mnemon = &mnemon_with_work.mnemon;
+    let mnemon_id = mnemon.id;
 
     // Stubbed audio state
     let mut is_playing = use_signal(|| false);
 
     rsx! {
         div {
-            class: "h-full overflow-y-auto px-8 py-6",
+            class: "h-full overflow-y-auto px-8 py-6 flex flex-col",
 
             // Audio player stub (only if theme music exists)
             if work.theme_music_local_uri.is_some() {
@@ -754,8 +921,24 @@ fn MemoryDetails(mnemon_with_work: MnemonWithWork) -> Element {
             // Empty state if no details
             if mnemon.feelings.is_empty() && mnemon.finished_date.is_none() && mnemon.notes.is_empty() && work.theme_music_local_uri.is_none() {
                 div {
-                    class: "flex items-center justify-center h-full text-white/40 italic",
+                    class: "flex items-center justify-center flex-1 text-white/40 italic",
                     "No additional details for this memory"
+                }
+            }
+
+            // Spacer to push delete button to bottom
+            div { class: "flex-1" }
+
+            // Delete button
+            div {
+                class: "pt-6 border-t border-white/10",
+
+                button {
+                    class: "w-full py-3 px-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors flex items-center justify-center gap-2",
+                    onclick: move |_| on_delete.call(mnemon_id),
+
+                    span { "🗑" }
+                    span { "Delete this memory" }
                 }
             }
         }

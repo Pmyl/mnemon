@@ -191,6 +191,33 @@ pub struct PersistedData {
     pub mnemons: Vec<Mnemon>,
 }
 
+/// Delete a mnemon from IndexedDB by ID
+pub async fn delete_mnemon(mnemon_id: &uuid::Uuid) -> StorageResult<()> {
+    let db = open_database().await?;
+
+    let transaction = db
+        .transaction(&[MNEMONS_STORE], TransactionMode::ReadWrite)
+        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+
+    let store = transaction
+        .store(MNEMONS_STORE)
+        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+
+    let js_key = serde_wasm_bindgen::to_value(&mnemon_id.to_string())?;
+    store
+        .delete(js_key)
+        .await
+        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+
+    transaction
+        .done()
+        .await
+        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+
+    info!("Deleted mnemon {} from IndexedDB", mnemon_id);
+    Ok(())
+}
+
 /// Load all persisted data (async version)
 pub async fn load_all_async() -> PersistedData {
     let works = load_works().await.unwrap_or_else(|e| {
