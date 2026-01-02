@@ -1,6 +1,7 @@
 //! Mnemon - A nostalgia-focused app to capture and resurface memories from Movies, TV/Anime, and Games
 
 use dioxus::prelude::*;
+use rand::seq::SliceRandom;
 use tracing::info;
 use uuid::Uuid;
 
@@ -45,6 +46,8 @@ struct MnemonWithWork {
 struct AppState {
     works: Signal<Vec<Work>>,
     mnemons: Signal<Vec<Mnemon>>,
+    /// Shuffled indices for randomized display order
+    shuffled_indices: Signal<Vec<usize>>,
     /// Whether initial data has been loaded from storage
     loaded: Signal<bool>,
 }
@@ -54,6 +57,7 @@ impl AppState {
         Self {
             works: Signal::new(Vec::new()),
             mnemons: Signal::new(Vec::new()),
+            shuffled_indices: Signal::new(Vec::new()),
             loaded: Signal::new(false),
         }
     }
@@ -67,8 +71,14 @@ impl AppState {
             persisted.mnemons.len()
         );
 
+        // Create shuffled indices for randomized display order
+        let mut indices: Vec<usize> = (0..persisted.mnemons.len()).collect();
+        let mut rng = rand::thread_rng();
+        indices.shuffle(&mut rng);
+
         self.works.set(persisted.works);
         self.mnemons.set(persisted.mnemons);
+        self.shuffled_indices.set(indices);
         self.loaded.set(true);
     }
 
@@ -77,7 +87,7 @@ impl AppState {
         *self.loaded.read()
     }
 
-    /// Get all mnemons with their associated works
+    /// Get all mnemons with their associated works (in original order)
     fn get_mnemons_with_works(&self) -> Vec<MnemonWithWork> {
         let works = self.works.read();
         let mnemons = self.mnemons.read();
@@ -94,6 +104,16 @@ impl AppState {
                     })
             })
             .collect()
+    }
+
+    /// Get the mnemon index for a given position in the shuffled order
+    fn get_shuffled_index(&self, shuffled_position: usize) -> Option<usize> {
+        self.shuffled_indices.read().get(shuffled_position).copied()
+    }
+
+    /// Get the total number of mnemons
+    fn mnemons_count(&self) -> usize {
+        self.shuffled_indices.read().len()
     }
 
     /// Find a work by provider reference
@@ -135,10 +155,19 @@ impl AppState {
         id
     }
 
-    /// Add a new mnemon
-    fn add_mnemon(&mut self, mnemon: Mnemon) {
+    /// Add a new mnemon, returns the shuffled position of the new mnemon
+    fn add_mnemon(&mut self, mnemon: Mnemon) -> usize {
         let mnemon_clone = mnemon.clone();
+        let new_index = self.mnemons.read().len();
         self.mnemons.write().push(mnemon);
+
+        // Reshuffle existing indices, then append the new mnemon's index at the end
+        let mut indices = self.shuffled_indices.write();
+        let mut rng = rand::thread_rng();
+        indices.shuffle(&mut rng);
+        indices.push(new_index);
+        let shuffled_position = indices.len() - 1;
+        drop(indices);
 
         // Persist asynchronously
         spawn(async move {
@@ -146,6 +175,8 @@ impl AppState {
                 info!("Failed to persist mnemon: {}", e);
             }
         });
+
+        shuffled_position
     }
 }
 
@@ -220,7 +251,7 @@ fn App() -> Element {
     // Add flow state
     let mut show_add_flow = use_signal(|| false);
 
-    // Get mnemons with works for display
+    // Get mnemons with works for display (in original order, indexed by shuffled_indices)
     let mnemons_with_works = use_memo(move || app_state().get_mnemons_with_works());
 
     let current_mnemon_with_work = use_memo(move || {
@@ -228,8 +259,10 @@ fn App() -> Element {
         if all.is_empty() {
             return None;
         }
-        let idx = current_index();
-        all.get(idx).cloned()
+        // current_index indexes into shuffled_indices, which gives us the actual mnemon index
+        let shuffled_pos = current_index();
+        let actual_index = app_state().get_shuffled_index(shuffled_pos)?;
+        all.get(actual_index).cloned()
     });
 
     // Auto-advance to next mnemon after HERO_AUTO_CYCLE_MS
@@ -238,7 +271,7 @@ fn App() -> Element {
             loop {
                 gloo_timers::future::TimeoutFuture::new(HERO_AUTO_CYCLE_MS).await;
 
-                let total = mnemons_with_works.read().len();
+                let total = app_state().mnemons_count();
                 if total == 0 {
                     continue;
                 }
@@ -343,11 +376,10 @@ fn App() -> Element {
 
                         let mnemon = Mnemon::new(work_id, finished_date, form.feelings.clone(), notes);
                         info!("Created new mnemon for work_id: {}", work_id);
-                        state.add_mnemon(mnemon);
+                        let shuffled_position = state.add_mnemon(mnemon);
 
-                        // Set current index to the new mnemon
-                        let new_index = state.get_mnemons_with_works().len() - 1;
-                        current_index.set(new_index);
+                        // Set current index to the shuffled position of the new mnemon
+                        current_index.set(shuffled_position);
 
                         show_add_flow.set(false);
                     },
