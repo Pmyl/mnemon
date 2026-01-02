@@ -10,6 +10,9 @@ pub const HERO_AUTO_CYCLE_MS: u32 = 10_000;
 /// Duration in milliseconds for the slide transition animation
 pub const HERO_TRANSITION_MS: u32 = 600;
 
+/// Duration in milliseconds for the details slide transition
+pub const DETAILS_TRANSITION_MS: u32 = 400;
+
 /// Small delay after transition before resetting state
 pub const HERO_TRANSITION_SETTLE_MS: u32 = 50;
 

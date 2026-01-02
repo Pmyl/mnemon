@@ -237,7 +237,8 @@ fn App() -> Element {
 
     // Load data from IndexedDB on mount
     use_effect(move || {
-        if !app_state().is_loaded() {
+        let is_loaded = app_state.peek().is_loaded();
+        if !is_loaded {
             spawn(async move {
                 app_state.write().load_from_storage().await;
             });
@@ -248,11 +249,17 @@ fn App() -> Element {
     let mut current_index = use_signal(|| 0usize);
     let mut is_transitioning = use_signal(|| false);
 
+    // Details view state
+    let mut details_open = use_signal(|| false);
+
+    // Debug: pause auto-cycle with S key
+    let mut paused = use_signal(|| false);
+
     // Add flow state
     let mut show_add_flow = use_signal(|| false);
 
     // Get mnemons with works for display (in original order, indexed by shuffled_indices)
-    let mnemons_with_works = use_memo(move || app_state().get_mnemons_with_works());
+    let mnemons_with_works = use_memo(move || app_state.read().get_mnemons_with_works());
 
     let current_mnemon_with_work = use_memo(move || {
         let all = mnemons_with_works();
@@ -261,17 +268,23 @@ fn App() -> Element {
         }
         // current_index indexes into shuffled_indices, which gives us the actual mnemon index
         let shuffled_pos = current_index();
-        let actual_index = app_state().get_shuffled_index(shuffled_pos)?;
+        let state = app_state.read();
+        let actual_index = state.get_shuffled_index(shuffled_pos)?;
         all.get(actual_index).cloned()
     });
 
-    // Auto-advance to next mnemon after HERO_AUTO_CYCLE_MS
+    // Auto-advance to next mnemon after HERO_AUTO_CYCLE_MS (pauses when details open)
     use_effect(move || {
         spawn(async move {
             loop {
                 gloo_timers::future::TimeoutFuture::new(HERO_AUTO_CYCLE_MS).await;
 
-                let total = app_state().mnemons_count();
+                // Skip cycling if details are open or paused
+                if details_open() || paused() {
+                    continue;
+                }
+
+                let total = app_state.peek().mnemons_count();
                 if total == 0 {
                     continue;
                 }
@@ -291,12 +304,23 @@ fn App() -> Element {
     });
 
     let has_mnemons = !mnemons_with_works().is_empty();
-    let is_loaded = app_state().is_loaded();
+    let is_loaded = app_state.read().is_loaded();
 
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+
+        // Global key handler for debug pause
+        div {
+            tabindex: 0,
+            autofocus: true,
+            onkeydown: move |e| {
+                if e.key() == Key::Character("s".to_string()) {
+                    paused.toggle();
+                    info!("Auto-cycle paused: {}", paused());
+                }
+            },
 
         div {
             class: "h-screen w-screen overflow-hidden bg-gray-900",
@@ -308,8 +332,12 @@ fn App() -> Element {
                         key: "{mnemon_with_work.mnemon.id}",
                         mnemon_with_work: mnemon_with_work.clone(),
                         is_transitioning: is_transitioning(),
-                        on_click: move |_| {
+                        details_open: details_open(),
+                        on_add_click: move |_| {
                             show_add_flow.set(true);
+                        },
+                        on_details_toggle: move |_| {
+                            details_open.toggle();
                         }
                     }
                 }
@@ -324,30 +352,34 @@ fn App() -> Element {
             if show_add_flow() {
                 AddMnemonFlow {
                     on_save: move |form: AddMnemonForm| {
-                        let mut state = app_state();
-
                         // Parse year
                         let year = form.year.trim().parse::<u16>().ok();
 
-                        // Create or reuse Work
-                        let work_id = if let Some(ref provider_ref) = form.provider_ref {
-                            // Check if work already exists
-                            if let Some(existing_work) = state.find_work_by_provider_ref(provider_ref) {
-                                info!("Reusing existing work: {}", existing_work.title_en);
-                                existing_work.id
-                            } else {
-                                // Create new work from provider
-                                let work = Work::from_provider(
-                                    form.work_type.clone().unwrap(),
-                                    form.title.clone(),
-                                    year,
-                                    form.cover_url.clone(),
-                                    form.theme_music_url.clone(),
-                                    provider_ref.clone(),
-                                );
-                                info!("Created new work from provider: {}", work.title_en);
-                                state.add_work(work)
-                            }
+                        // First, do reads without holding a write lock
+                        let existing_work_id = if let Some(ref provider_ref) = form.provider_ref {
+                            app_state.peek().find_work_by_provider_ref(provider_ref).map(|w| {
+                                info!("Reusing existing work: {}", w.title_en);
+                                w.id
+                            })
+                        } else {
+                            None
+                        };
+
+                        // Now do writes
+                        let work_id = if let Some(id) = existing_work_id {
+                            id
+                        } else if let Some(ref provider_ref) = form.provider_ref {
+                            // Create new work from provider
+                            let work = Work::from_provider(
+                                form.work_type.clone().unwrap(),
+                                form.title.clone(),
+                                year,
+                                form.cover_url.clone(),
+                                form.theme_music_url.clone(),
+                                provider_ref.clone(),
+                            );
+                            info!("Created new work from provider: {}", work.title_en);
+                            app_state.write().add_work(work)
                         } else {
                             // Create manual work
                             let work = Work::from_manual(
@@ -356,7 +388,7 @@ fn App() -> Element {
                                 year,
                             );
                             info!("Created manual work: {}", work.title_en);
-                            state.add_work(work)
+                            app_state.write().add_work(work)
                         };
 
                         // Split notes by newlines
@@ -376,7 +408,7 @@ fn App() -> Element {
 
                         let mnemon = Mnemon::new(work_id, finished_date, form.feelings.clone(), notes);
                         info!("Created new mnemon for work_id: {}", work_id);
-                        let shuffled_position = state.add_mnemon(mnemon);
+                        let shuffled_position = app_state.write().add_mnemon(mnemon);
 
                         // Set current index to the shuffled position of the new mnemon
                         current_index.set(shuffled_position);
@@ -387,6 +419,7 @@ fn App() -> Element {
                         show_add_flow.set(false);
                     }
                 }
+            }
             }
         }
     }
@@ -400,13 +433,18 @@ fn App() -> Element {
 fn Hero(
     mnemon_with_work: MnemonWithWork,
     is_transitioning: bool,
-    on_click: EventHandler<()>,
+    details_open: bool,
+    on_add_click: EventHandler<()>,
+    on_details_toggle: EventHandler<()>,
 ) -> Element {
     use rand::seq::SliceRandom;
     use rand::thread_rng;
 
     let work = mnemon_with_work.work.clone();
     let mnemon = mnemon_with_work.mnemon.clone();
+
+    // Measured height of the title bar content
+    let mut title_bar_height = use_signal(|| 150.0f64); // Default fallback
 
     // Current note index
     let mut current_note_index = use_signal(|| 0usize);
@@ -425,10 +463,10 @@ fn Hero(
             .collect::<Vec<String>>()
     });
 
-    // Rotate through notes with fade animation
+    // Rotate through notes with fade animation (only when details closed)
     use_effect(move || {
         let notes = selected_notes();
-        if notes.is_empty() {
+        if notes.is_empty() || details_open {
             return;
         }
 
@@ -459,7 +497,8 @@ fn Hero(
         notes.get(idx).cloned()
     });
 
-    let transition_style = if is_transitioning {
+    // Horizontal transition for slideshow
+    let horizontal_transition = if is_transitioning {
         format!(
             "transform: translateX(-100%); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);",
             HERO_TRANSITION_MS
@@ -471,72 +510,252 @@ fn Hero(
         )
     };
 
+    // Vertical slide for details reveal - slides up to show only title bar (using measured height)
+    // Add 32px top padding so title doesn't sit flush at top of viewport
+    let measured_height = title_bar_height();
+    let visible_height = measured_height + 32.0;
+    let vertical_slide = if details_open {
+        format!("transform: translateY(calc(-100% + {}px)); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);", visible_height, DETAILS_TRANSITION_MS)
+    } else {
+        format!(
+            "transform: translateY(0); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);",
+            DETAILS_TRANSITION_MS
+        )
+    };
+
     rsx! {
+        // Container for hero + details (full viewport height, with hero stacked above details)
         div {
-            class: "relative h-full w-full cursor-pointer",
-            style: "{transition_style}",
-            onclick: move |_| on_click.call(()),
+            class: "relative h-full w-full",
+            style: "{horizontal_transition}",
 
-            // Background cover image with overlay
+            // Sliding container (hero + details stacked vertically)
             div {
-                class: "absolute inset-0 z-0",
-                style: if let Some(ref url) = work.cover_image_local_uri {
-                    format!("background-image: url('{}'); background-size: cover; background-position: center; background-repeat: no-repeat;", url)
-                } else {
-                    "background-color: #1a1a2e;".to_string()
-                },
+                class: "absolute inset-0",
+                style: "{vertical_slide}",
 
-                // Dark overlay for readability
+                // Hero section (full viewport height) - original layout preserved
                 div {
-                    class: "absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-black/50"
-                }
-            }
+                    class: "relative h-screen w-full cursor-pointer",
+                    onclick: move |_| on_add_click.call(()),
 
-            // Note display - lower left
-            if let Some(note) = current_note() {
-                div {
-                    class: "absolute left-4 top-2/3 z-10 max-w-lg max-w-80 transition-opacity duration-500",
-                    style: if note_visible() { "opacity: 1;" } else { "opacity: 0;" },
-
-                    p {
-                        class: "text-white/90 text-lg leading-relaxed font-light italic",
-                        "\"{note}\""
-                    }
-                }
-            }
-
-            // Content overlay - footnote style at bottom right
-            div {
-                class: "relative z-10 px-8 pb-8 flex items-end justify-end h-full",
-
-                div {
-                    class: "max-w-md",
-
-                    // Icon and Title
+                    // Background cover image with overlay
                     div {
-                        class: "flex items-center gap-3 mb-3",
-                        span {
-                            class: "text-2xl opacity-90",
-                            "{work.work_type.icon()}"
-                        }
-                        h1 {
-                            class: "text-2xl font-semibold text-white/95",
-                            "{work.title_en}"
+                        class: "absolute inset-0 z-0",
+                        style: if let Some(ref url) = work.cover_image_local_uri {
+                            format!("background-image: url('{}'); background-size: cover; background-position: center; background-repeat: no-repeat;", url)
+                        } else {
+                            "background-color: #1a1a2e;".to_string()
+                        },
+
+                        // Dark overlay for readability
+                        div {
+                            class: "absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-black/50"
                         }
                     }
 
-                    // Feelings
-                    if !mnemon_with_work.mnemon.feelings.is_empty() {
-                        div {
-                            class: "flex flex-wrap gap-2",
-                            for feeling in mnemon_with_work.mnemon.feelings.iter() {
-                                span {
-                                    class: "px-3 py-1 bg-white/15 backdrop-blur-sm text-white/90 text-sm rounded-full border border-white/20",
-                                    "{feeling}"
+                    // Note display - lower left (only visible when details closed)
+                    if !details_open {
+                        if let Some(note) = current_note() {
+                            div {
+                                class: "absolute left-4 top-2/3 z-10 max-w-lg max-w-80 transition-opacity duration-500",
+                                style: if note_visible() { "opacity: 1;" } else { "opacity: 0;" },
+
+                                p {
+                                    class: "text-white/90 text-lg leading-relaxed font-light italic",
+                                    "\"{note}\""
                                 }
                             }
                         }
                     }
+
+                    // Content overlay - footnote style at bottom right (original layout)
+                    div {
+                        class: "absolute inset-0 z-10 px-8 pb-8 flex items-end justify-end pointer-events-none",
+
+                        div {
+                            class: "max-w-md",
+                            onmounted: move |evt| {
+                                let data = evt.data();
+                                spawn(async move {
+                                    if let Ok(rect) = data.get_client_rect().await {
+                                        // Add padding (pb-8 = 32px) to the measured content height
+                                        let height = rect.height() + 32.0;
+                                        title_bar_height.set(height);
+                                    }
+                                });
+                            },
+
+                            // Icon and Title
+                            div {
+                                class: "flex items-center gap-3 mb-3",
+                                span {
+                                    class: "text-2xl opacity-90",
+                                    "{work.work_type.icon()}"
+                                }
+                                h1 {
+                                    class: "text-2xl font-semibold text-white/95",
+                                    "{work.title_en}"
+                                }
+                            }
+
+                            // Feelings
+                            if !mnemon.feelings.is_empty() {
+                                div {
+                                    class: "flex flex-wrap gap-2",
+                                    for feeling in mnemon.feelings.iter() {
+                                        span {
+                                            class: "px-3 py-1 bg-white/15 backdrop-blur-sm text-white/90 text-sm rounded-full border border-white/20",
+                                            "{feeling}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Bottom click zone - toggles details (title bar area, uses measured height + top padding)
+                    div {
+                        class: "absolute bottom-0 left-0 right-0 z-30 cursor-pointer",
+                        style: "height: {visible_height}px;",
+                        onclick: move |e| {
+                            e.stop_propagation();
+                            on_details_toggle.call(());
+                        },
+                    }
+                }
+
+                // Details section (below hero, same height as viewport minus visible title area)
+                div {
+                    class: "relative w-full bg-gray-900",
+                    style: "height: calc(100vh - {visible_height}px);",
+
+                    MemoryDetails {
+                        mnemon_with_work: mnemon_with_work.clone(),
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// MEMORY DETAILS COMPONENT
+// =============================================================================
+
+#[component]
+fn MemoryDetails(mnemon_with_work: MnemonWithWork) -> Element {
+    let work = &mnemon_with_work.work;
+    let mnemon = &mnemon_with_work.mnemon;
+
+    // Stubbed audio state
+    let mut is_playing = use_signal(|| false);
+
+    rsx! {
+        div {
+            class: "h-full overflow-y-auto px-8 py-6",
+
+            // Audio player stub (only if theme music exists)
+            if work.theme_music_local_uri.is_some() {
+                div {
+                    class: "mb-6 flex items-center gap-4",
+
+                    button {
+                        class: "w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors",
+                        onclick: move |_| is_playing.toggle(),
+
+                        span {
+                            class: "text-2xl text-white",
+                            if is_playing() { "⏸" } else { "▶" }
+                        }
+                    }
+
+                    div {
+                        class: "flex-1",
+
+                        // Progress bar stub
+                        div {
+                            class: "h-1 bg-white/20 rounded-full overflow-hidden",
+                            div {
+                                class: "h-full bg-white/60 rounded-full",
+                                style: "width: 0%;",
+                            }
+                        }
+
+                        p {
+                            class: "text-sm text-white/40 mt-1",
+                            "Theme music"
+                        }
+                    }
+                }
+            }
+
+            // Feelings chips
+            if !mnemon.feelings.is_empty() {
+                div {
+                    class: "mb-6",
+
+                    h3 {
+                        class: "text-sm text-white/50 uppercase tracking-wide mb-3",
+                        "Feelings"
+                    }
+
+                    div {
+                        class: "flex flex-wrap gap-2",
+                        for feeling in mnemon.feelings.iter() {
+                            span {
+                                class: "px-4 py-2 bg-white/10 text-white/90 rounded-full border border-white/20",
+                                "{feeling}"
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Finished date
+            if let Some(ref finished_date) = mnemon.finished_date {
+                div {
+                    class: "mb-6",
+
+                    h3 {
+                        class: "text-sm text-white/50 uppercase tracking-wide mb-2",
+                        "Finished"
+                    }
+
+                    p {
+                        class: "text-white/80",
+                        "{finished_date}"
+                    }
+                }
+            }
+
+            // Notes
+            if !mnemon.notes.is_empty() {
+                div {
+                    class: "mb-6",
+
+                    h3 {
+                        class: "text-sm text-white/50 uppercase tracking-wide mb-3",
+                        "Notes"
+                    }
+
+                    div {
+                        class: "space-y-3",
+                        for note in mnemon.notes.iter() {
+                            p {
+                                class: "text-white/80 leading-relaxed",
+                                "{note}"
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Empty state if no details
+            if mnemon.feelings.is_empty() && mnemon.finished_date.is_none() && mnemon.notes.is_empty() && work.theme_music_local_uri.is_none() {
+                div {
+                    class: "flex items-center justify-center h-full text-white/40 italic",
+                    "No additional details for this memory"
                 }
             }
         }
