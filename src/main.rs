@@ -1247,7 +1247,7 @@ fn Step1ManualEntry(
                     for work_type in [WorkType::Movie, WorkType::TvAnime, WorkType::Game] {
                         button {
                             class: if local_form().work_type == Some(work_type.clone()) {
-                                "flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg border-2 border-blue-500 font-medium"
+                                "flex items-center gap-2 px-4 py-3 bg-transparent text-white rounded-lg border-2 border-white font-medium"
                             } else {
                                 "flex items-center gap-2 px-4 py-3 bg-gray-700 text-gray-300 rounded-lg border-2 border-gray-600 hover:border-gray-500 font-medium"
                             },
@@ -1284,7 +1284,7 @@ fn Step1ManualEntry(
                 div {
                     class: "relative",
                     input {
-                        class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none pr-10",
+                        class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-white focus:outline-none pr-10",
                         r#type: "text",
                         placeholder: if local_form().work_type.is_some() {
                             "Search or enter title..."
@@ -1357,7 +1357,7 @@ fn Step1ManualEntry(
                         div {
                             class: "absolute right-3 top-1/2 -translate-y-1/2",
                             div {
-                                class: "w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
+                                class: "w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
                             }
                         }
                     }
@@ -1496,7 +1496,7 @@ fn Step1ManualEntry(
                     "Notes"
                 }
                 textarea {
-                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none min-h-[120px] resize-y",
+                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-white focus:outline-none min-h-[120px] resize-y",
                     placeholder: "Add your thoughts, memories, or reflections...",
                     value: "{local_form().notes}",
                     oninput: move |e| {
@@ -1524,11 +1524,11 @@ fn Step1ManualEntry(
                             rsx! {
                                 button {
                                     class: if is_selected {
-                                        "px-4 py-2 bg-blue-600 text-white rounded-full border-2 border-blue-500 text-sm font-medium"
+                                        "px-4 py-2 bg-transparent text-white rounded-full border-2 border-white text-sm font-medium"
                                     } else if can_add {
-                                        "px-4 py-2 bg-gray-700 text-gray-300 rounded-full border-2 border-gray-600 hover:border-gray-500 text-sm font-medium"
+                                        "px-4 py-2 bg-gray-700 text-gray-300 rounded-full border-2 border-gray-600 hover:border-gray-500 text-sm font-medium cursor-pointer"
                                     } else {
-                                        "px-4 py-2 bg-gray-800 text-gray-500 rounded-full border-2 border-gray-700 text-sm font-medium cursor-not-allowed"
+                                        "px-4 py-2 bg-gray-800 text-gray-500 rounded-full border-2 border-gray-700 text-sm font-medium cursor-not-allowed opacity-50"
                                     },
                                     disabled: !is_selected && !can_add,
                                     onclick: move |_| {
@@ -1559,9 +1559,9 @@ fn Step1ManualEntry(
                 }
                 button {
                     class: if is_valid {
-                        "px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+                        "px-6 py-3 bg-transparent border-2 border-white hover:bg-white/10 text-white rounded-lg font-medium flex items-center gap-2"
                     } else {
-                        "px-6 py-3 bg-gray-600 text-gray-400 rounded-lg font-medium cursor-not-allowed"
+                        "px-6 py-3 bg-gray-700 text-gray-500 rounded-lg font-medium cursor-not-allowed flex items-center gap-2"
                     },
                     disabled: !is_valid,
                     onclick: move |_| {
@@ -1569,7 +1569,8 @@ fn Step1ManualEntry(
                             on_next.call(local_form());
                         }
                     },
-                    "Next →"
+                    span { "Next" }
+                    span { "→" }
                 }
             }
         }
@@ -1830,7 +1831,7 @@ fn SettingsModal(paused: Signal<bool>, on_close: EventHandler<()>) -> Element {
                     }
 
                     button {
-                        class: "px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors",
+                        class: "px-6 py-2 bg-transparent border-2 border-white hover:bg-white/10 text-white rounded-lg font-medium transition-colors",
                         onclick: move |_| {
                             let success = local_settings().save();
                             save_status.set(Some(success));
@@ -1883,7 +1884,7 @@ fn Step2Personalize(
                     "Release Year"
                 }
                 input {
-                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none",
+                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-white focus:outline-none",
                     r#type: "text",
                     placeholder: "YYYY",
                     value: "{local_form().year}",
@@ -1914,7 +1915,7 @@ fn Step2Personalize(
                     span { class: "text-gray-400 ml-1 text-xs", "(when you completed it)" }
                 }
                 input {
-                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-blue-500 focus:outline-none",
+                    class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-white focus:outline-none",
                     r#type: "date",
                     value: "{local_form().finished_date}",
                     oninput: move |e| {
@@ -1927,12 +1928,13 @@ fn Step2Personalize(
             div {
                 class: "flex gap-3 justify-between",
                 button {
-                    class: "px-6 py-3 text-gray-300 hover:text-white font-medium",
+                    class: "px-6 py-3 text-gray-300 hover:text-white font-medium flex items-center gap-2",
                     onclick: move |_| on_back.call(local_form()),
-                    "← Back"
+                    span { "←" }
+                    span { "Back" }
                 }
                 button {
-                    class: "px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium",
+                    class: "px-6 py-3 bg-transparent border-2 border-white hover:bg-white/10 text-white rounded-lg font-medium",
                     onclick: move |_| {
                         on_save.call(local_form());
                     },
