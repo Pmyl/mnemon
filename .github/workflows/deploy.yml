@@ -78,12 +78,12 @@ jobs:
         run: dx bundle --release --platform web --base-path mnemon
 
       - name: Create .nojekyll file
-        run: touch ./dist/.nojekyll
+        run: touch ./dist/public/.nojekyll
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./dist/public
 
   deploy:
     environment:
