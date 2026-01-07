@@ -8,20 +8,16 @@
 
 use crate::models::{ProviderRef, SearchResult, WorkType};
 use crate::providers::{ProviderError, ProviderResult, ProviderStatus};
+use crate::settings;
 use serde::Deserialize;
 use tracing::info;
 
 /// RAWG API base URL
 const RAWG_API_BASE: &str = "https://api.rawg.io/api";
 
-/// Environment variable name for the API key
-const RAWG_API_KEY_ENV: &str = "RAWG_API_KEY";
-
 /// RAWG API client
 #[derive(Clone)]
 pub struct RawgClient {
-    /// API key for authentication
-    api_key: Option<String>,
     /// HTTP client
     client: reqwest::Client,
 }
@@ -75,32 +71,21 @@ impl RawgGame {
 
 impl RawgClient {
     /// Create a new RAWG client
-    ///
-    /// Reads the API key from the RAWG_API_KEY environment variable.
-    /// If the key is not set, the client will be in "not configured" state.
     pub fn new() -> Self {
-        let api_key = get_rawg_api_key();
-
-        if api_key.is_some() {
-            info!("RAWG client initialized with API key");
-        } else {
-            info!("RAWG client initialized without API key (not configured)");
-        }
-
+        info!("RAWG client initialized");
         Self {
-            api_key,
             client: reqwest::Client::new(),
         }
     }
 
-    /// Check if the client has a valid API key configured
+    /// Check if the client has a valid API key configured (checks localStorage)
     pub fn is_configured(&self) -> bool {
-        self.api_key.is_some()
+        settings::is_rawg_configured()
     }
 
-    /// Get the provider status
+    /// Get the provider status (checks localStorage)
     pub fn status(&self) -> ProviderStatus {
-        if self.api_key.is_some() {
+        if settings::is_rawg_configured() {
             ProviderStatus::Available
         } else {
             ProviderStatus::NotConfigured
@@ -109,10 +94,11 @@ impl RawgClient {
 
     /// Search for games
     pub async fn search(&self, query: &str, page: usize) -> ProviderResult<Vec<SearchResult>> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or_else(|| ProviderError::AuthError("RAWG API key not configured".to_string()))?;
+        let api_key = settings::get_rawg_api_key().ok_or_else(|| {
+            ProviderError::AuthError(
+                "RAWG API key not configured. Add your key in Settings.".to_string(),
+            )
+        })?;
 
         // Don't search with empty query
         if query.trim().is_empty() {
@@ -126,7 +112,7 @@ impl RawgClient {
         let url = format!(
             "{}/games?key={}&search={}&page={}&page_size={}",
             RAWG_API_BASE,
-            api_key,
+            &api_key,
             urlencoding::encode(query),
             rawg_page,
             page_size
@@ -140,7 +126,29 @@ impl RawgClient {
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| ProviderError::NetworkError(e.to_string()))?;
+            .map_err(|e| {
+                let err_msg = e.to_string();
+                info!("RAWG network error during request: {}", err_msg);
+
+                // In browser/WASM, when RAWG returns 401 for invalid API key,
+                // the browser's CORS policy blocks the response and reqwest
+                // reports it as "error sending request" before we can check status.
+                // We need to treat this as an auth error, not a network error.
+                if err_msg.contains("error sending request") {
+                    info!("Detected 'error sending request' - likely CORS-blocked 401 from RAWG");
+                    ProviderError::ApiError {
+                        status: 401,
+                        message: "Invalid or missing API key".to_string(),
+                    }
+                } else if err_msg.contains("401") || err_msg.contains("Unauthorized") {
+                    ProviderError::ApiError {
+                        status: 401,
+                        message: "Invalid API key".to_string(),
+                    }
+                } else {
+                    ProviderError::NetworkError(err_msg)
+                }
+            })?;
 
         let status = response.status();
         if !status.is_success() {
@@ -176,17 +184,6 @@ impl Default for RawgClient {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/// Get the RAWG API key from environment
-///
-/// In WASM context, we use a compile-time environment variable.
-fn get_rawg_api_key() -> Option<String> {
-    option_env!("RAWG_API_KEY").map(|s| s.to_string())
 }
 
 #[cfg(test)]

@@ -12,3 +12,5 @@ If you are implementing a design feature, follow the guidelines in the WIREFRAME
 At the beginning of each phase ask questions if you are unsure about the requirements or implementation details.
 
 Assume I'm always running `dx serve`, no need to run `dx build`, `cargo check` is enough.
+
+Do not create other md files unless requested

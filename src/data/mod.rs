@@ -27,6 +27,8 @@ pub enum SearchStatus {
     ProviderNotConfigured,
     /// Network error, using fallback or manual entry
     NetworkError(String),
+    /// API error (invalid key, rate limit, etc.)
+    ApiError { status: u16, message: String },
     /// Using fixture data (for Games)
     UsingFixtures,
 }
@@ -66,6 +68,15 @@ impl SearchResponse {
         Self {
             results: Vec::new(),
             status: SearchStatus::NetworkError(message),
+            total_count: None,
+        }
+    }
+
+    /// Create a response for API error (invalid key, rate limit, etc.)
+    pub fn api_error(status: u16, message: String) -> Self {
+        Self {
+            results: Vec::new(),
+            status: SearchStatus::ApiError { status, message },
             total_count: None,
         }
     }
@@ -131,6 +142,8 @@ impl SearchService {
             return SearchResponse::success(Vec::new(), Some(0));
         }
 
+        info!("TMDB is configured, performing search for '{}'", query);
+
         // Perform the search
         match self.tmdb.search(query, work_type, page).await {
             Ok(results) => {
@@ -138,11 +151,28 @@ impl SearchService {
                 SearchResponse::success(results, None)
             }
             Err(e) => {
-                info!("TMDB search error: {}", e);
+                info!(
+                    "TMDB search error: {} (type: {:?})",
+                    e,
+                    std::mem::discriminant(&e)
+                );
                 match e {
-                    ProviderError::NetworkError(msg) => SearchResponse::network_error(msg),
-                    ProviderError::AuthError(_) => SearchResponse::not_configured(),
-                    _ => SearchResponse::network_error(e.to_string()),
+                    ProviderError::NetworkError(msg) => {
+                        info!("Returning NetworkError response for TMDB");
+                        SearchResponse::network_error(msg)
+                    }
+                    ProviderError::AuthError(_) => {
+                        info!("Returning NotConfigured response for TMDB");
+                        SearchResponse::not_configured()
+                    }
+                    ProviderError::ApiError { status, message } => {
+                        info!("Returning ApiError response for TMDB ({})", status);
+                        SearchResponse::api_error(status, message)
+                    }
+                    _ => {
+                        info!("Returning NetworkError (fallback) response for TMDB");
+                        SearchResponse::network_error(e.to_string())
+                    }
                 }
             }
         }
@@ -161,6 +191,8 @@ impl SearchService {
             return SearchResponse::success(Vec::new(), Some(0));
         }
 
+        info!("RAWG is configured, performing search for '{}'", query);
+
         // Perform the search
         match self.rawg.search(query, page).await {
             Ok(results) => {
@@ -168,11 +200,28 @@ impl SearchService {
                 SearchResponse::success(results, None)
             }
             Err(e) => {
-                info!("RAWG search error: {}", e);
+                info!(
+                    "RAWG search error: {} (type: {:?})",
+                    e,
+                    std::mem::discriminant(&e)
+                );
                 match e {
-                    ProviderError::NetworkError(msg) => SearchResponse::network_error(msg),
-                    ProviderError::AuthError(_) => SearchResponse::not_configured(),
-                    _ => SearchResponse::network_error(e.to_string()),
+                    ProviderError::NetworkError(msg) => {
+                        info!("Returning NetworkError response for RAWG");
+                        SearchResponse::network_error(msg)
+                    }
+                    ProviderError::AuthError(_) => {
+                        info!("Returning NotConfigured response for RAWG");
+                        SearchResponse::not_configured()
+                    }
+                    ProviderError::ApiError { status, message } => {
+                        info!("Returning ApiError response for RAWG ({})", status);
+                        SearchResponse::api_error(status, message)
+                    }
+                    _ => {
+                        info!("Returning NetworkError (fallback) response for RAWG");
+                        SearchResponse::network_error(e.to_string())
+                    }
                 }
             }
         }

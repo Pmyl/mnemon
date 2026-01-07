@@ -7,6 +7,7 @@
 
 use crate::models::{ProviderRef, SearchResult, WorkType};
 use crate::providers::{ProviderError, ProviderResult, ProviderStatus};
+use crate::settings;
 use serde::Deserialize;
 use tracing::info;
 
@@ -16,14 +17,9 @@ const TMDB_API_BASE: &str = "https://api.themoviedb.org/3";
 /// TMDB image base URL (w500 size for covers)
 const TMDB_IMAGE_BASE: &str = "https://image.tmdb.org/t/p/w500";
 
-/// Environment variable name for the API token
-const TMDB_TOKEN_ENV: &str = "TMDB_ACCESS_TOKEN";
-
 /// TMDB API client
 #[derive(Clone)]
 pub struct TmdbClient {
-    /// Bearer token for API authentication
-    token: Option<String>,
     /// HTTP client
     client: reqwest::Client,
 }
@@ -106,32 +102,21 @@ impl TmdbSearchResult {
 
 impl TmdbClient {
     /// Create a new TMDB client
-    ///
-    /// Reads the API token from the TMDB_ACCESS_TOKEN environment variable.
-    /// If the token is not set, the client will be in "not configured" state.
     pub fn new() -> Self {
-        let token = get_tmdb_token();
-
-        if token.is_some() {
-            info!("TMDB client initialized with token");
-        } else {
-            info!("TMDB client initialized without token (not configured)");
-        }
-
+        info!("TMDB client initialized");
         Self {
-            token,
             client: reqwest::Client::new(),
         }
     }
 
-    /// Check if the client has a valid token configured
+    /// Check if the client has a valid token configured (checks localStorage)
     pub fn is_configured(&self) -> bool {
-        self.token.is_some()
+        settings::is_tmdb_configured()
     }
 
-    /// Get the provider status
+    /// Get the provider status (checks localStorage)
     pub fn status(&self) -> ProviderStatus {
-        if self.token.is_some() {
+        if settings::is_tmdb_configured() {
             ProviderStatus::Available
         } else {
             ProviderStatus::NotConfigured
@@ -175,10 +160,11 @@ impl TmdbClient {
         work_type: WorkType,
         page: usize,
     ) -> ProviderResult<Vec<SearchResult>> {
-        let token = self
-            .token
-            .as_ref()
-            .ok_or_else(|| ProviderError::AuthError("TMDB API token not configured".to_string()))?;
+        let token = settings::get_tmdb_token().ok_or_else(|| {
+            ProviderError::AuthError(
+                "TMDB API token not configured. Add your token in Settings.".to_string(),
+            )
+        })?;
 
         // TMDB uses 1-indexed pages
         let tmdb_page = page + 1;
@@ -202,7 +188,7 @@ impl TmdbClient {
         let response = self
             .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {}", &token))
             .header("Accept", "application/json")
             .send()
             .await
@@ -243,20 +229,6 @@ impl Default for TmdbClient {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/// Get the TMDB token from environment
-///
-/// In WASM context, we use a compile-time environment variable.
-/// In native context, we could read from runtime environment.
-fn get_tmdb_token() -> Option<String> {
-    // For WASM, we need to use option_env! at compile time
-    // For native builds, we could use std::env::var at runtime
-    option_env!("TMDB_ACCESS_TOKEN").map(|s| s.to_string())
 }
 
 #[cfg(test)]
