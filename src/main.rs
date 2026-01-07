@@ -308,8 +308,8 @@ fn App() -> Element {
     // Details view state
     let mut details_open = use_signal(|| false);
 
-    // Debug: pause auto-cycle with S key
-    let mut paused = use_signal(|| false);
+    // Auto-cycle pause state (controlled via Settings)
+    let paused = use_signal(|| false);
 
     // Add flow state
     let mut show_add_flow = use_signal(|| false);
@@ -375,18 +375,6 @@ fn App() -> Element {
 
         // Global key handler for debug pause
         div {
-            tabindex: 0,
-            autofocus: true,
-            onkeydown: move |e| {
-                if e.key() == Key::Character("s".to_string()) {
-                    paused.toggle();
-                    info!("Auto-cycle paused: {}", paused());
-                }
-                // Open settings with comma key (common convention)
-                if e.key() == Key::Character(",".to_string()) {
-                    show_settings.set(true);
-                }
-            },
 
         div {
             class: "h-screen w-screen overflow-hidden bg-gray-900",
@@ -527,6 +515,7 @@ fn App() -> Element {
             // Settings modal
             if show_settings() {
                 SettingsModal {
+                    paused: paused,
                     on_close: move |_| {
                         show_settings.set(false);
                     }
@@ -1592,7 +1581,7 @@ fn Step1ManualEntry(
 // =============================================================================
 
 #[component]
-fn SettingsModal(on_close: EventHandler<()>) -> Element {
+fn SettingsModal(paused: Signal<bool>, on_close: EventHandler<()>) -> Element {
     use crate::settings::ApiTokenSettings;
 
     // Load current settings into local state
@@ -1651,6 +1640,72 @@ fn SettingsModal(on_close: EventHandler<()>) -> Element {
                         class: "text-gray-400 text-sm mb-6",
                         "Configure your API keys to enable search for movies, TV shows, and games. "
                         "Keys are stored locally in your browser."
+                    }
+
+                    // Auto-cycle pause toggle
+                    div {
+                        class: "mb-6 p-4 bg-gray-700/50 rounded-lg",
+
+                        div {
+                            class: "flex items-center justify-between gap-4",
+
+                            div {
+                                class: "flex-1",
+                                label {
+                                    class: "block text-white text-sm font-semibold mb-1",
+                                    "Auto-cycle Playback"
+                                }
+                                p {
+                                    class: "text-gray-400 text-xs mb-1",
+                                    "Automatically rotate through your mnemons"
+                                }
+                                // Current status indicator
+                                div {
+                                    class: "flex items-center gap-1 mt-2",
+                                    div {
+                                        class: if !paused() {
+                                            "w-2 h-2 bg-green-500 rounded-full animate-pulse"
+                                        } else {
+                                            "w-2 h-2 bg-gray-500 rounded-full"
+                                        }
+                                    }
+                                    span {
+                                        class: if !paused() {
+                                            "text-xs font-medium text-green-400"
+                                        } else {
+                                            "text-xs font-medium text-gray-500"
+                                        },
+                                        if !paused() {
+                                            "Playing"
+                                        } else {
+                                            "Paused"
+                                        }
+                                    }
+                                }
+                            }
+
+                            button {
+                                class: if !paused() {
+                                    "relative w-14 h-7 bg-green-600 hover:bg-green-700 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                } else {
+                                    "relative w-14 h-7 bg-gray-600 hover:bg-gray-500 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                },
+                                onclick: move |_| {
+                                    paused.toggle();
+                                    info!("Auto-cycle paused: {}", paused());
+                                },
+                                "aria-label": if !paused() { "Pause auto-cycle" } else { "Resume auto-cycle" },
+                                "aria-pressed": if !paused() { "true" } else { "false" },
+
+                                div {
+                                    class: if !paused() {
+                                        "absolute left-8 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-in-out"
+                                    } else {
+                                        "absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-in-out"
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // TMDB Token
