@@ -43,6 +43,10 @@ Run the following command in the root of your project to start developing with t
 for line in (cat .env | grep -v '^#' | grep -v '^\s*$'); set -gx (echo $line | cut -d= -f1) (echo $line | cut -d= -f2-); end; dx serve
 ```
 
+```bash
+export $(grep -v '^#' .env | grep -v '^\s*$' | xargs) && dx serve
+```
+
 To run for a different platform, use the `--platform platform` flag. E.g.
 ```bash
 dx serve --platform desktop
