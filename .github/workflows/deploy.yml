@@ -75,7 +75,7 @@ jobs:
         run: npx tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --minify
 
       - name: Build Dioxus app
-        run: dx build --release --platform web --base-path mnemon
+        run: dx bundle --release --platform web --base-path mnemon
 
       - name: Create .nojekyll file
         run: touch ./dist/.nojekyll
