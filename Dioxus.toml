@@ -1,5 +1,8 @@
 [application]
 
+# Output directory for web builds
+out_dir = "dist"
+
 [web.app]
 
 # HTML title tag content
