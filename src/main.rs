@@ -234,6 +234,32 @@ impl AppState {
             }
         });
     }
+
+    /// Update an existing mnemon (only feelings, notes, and finished_date can be edited)
+    fn edit_mnemon(
+        &mut self,
+        mnemon_id: Uuid,
+        finished_date: Option<String>,
+        feelings: Vec<String>,
+        notes: Vec<String>,
+    ) {
+        let mut mnemons = self.mnemons.write();
+        if let Some(mnemon) = mnemons.iter_mut().find(|m| m.id == mnemon_id) {
+            mnemon.finished_date = finished_date;
+            mnemon.feelings = feelings;
+            mnemon.notes = notes;
+
+            let mnemon_clone = mnemon.clone();
+            info!("Updated mnemon {} in memory", mnemon_id);
+
+            // Persist asynchronously
+            spawn(async move {
+                if let Err(e) = storage::save_mnemon(&mnemon_clone).await {
+                    info!("Failed to persist updated mnemon: {}", e);
+                }
+            });
+        }
+    }
 }
 
 // =============================================================================
@@ -262,6 +288,21 @@ struct AddMnemonForm {
 impl AddMnemonForm {
     fn is_step1_valid(&self) -> bool {
         self.work_type.is_some() && !self.title.trim().is_empty()
+    }
+
+    /// Create a form from an existing mnemon for editing (only editable fields)
+    fn from_mnemon_for_edit(mnemon: &Mnemon, work: &Work) -> Self {
+        Self {
+            work_type: Some(work.work_type.clone()),
+            title: work.title_en.clone(),
+            year: work.release_year.map(|y| y.to_string()).unwrap_or_default(),
+            provider_ref: work.provider_ref.clone(),
+            cover_url: work.cover_image_local_uri.clone(),
+            theme_music_url: work.theme_music_local_uri.clone(),
+            finished_date: mnemon.finished_date.clone().unwrap_or_default(),
+            feelings: mnemon.feelings.clone(),
+            notes: mnemon.notes.join("\n"),
+        }
     }
 }
 
@@ -313,6 +354,9 @@ fn App() -> Element {
 
     // Add flow state
     let mut show_add_flow = use_signal(|| false);
+
+    // Edit flow state
+    let mut edit_mnemon_id = use_signal(|| Option::<Uuid>::None);
 
     // Settings modal state
     let mut show_settings = use_signal(|| false);
@@ -392,6 +436,10 @@ fn App() -> Element {
                         },
                         on_details_toggle: move |_| {
                             details_open.toggle();
+                        },
+                        on_edit: move |mnemon_id: Uuid| {
+                            edit_mnemon_id.set(Some(mnemon_id));
+                            details_open.set(false);
                         },
                         on_delete: move |mnemon_id: Uuid| {
                             // Remove from memory and store for potential undo
@@ -492,6 +540,54 @@ fn App() -> Element {
                 }
             }
 
+            // Edit flow
+            if let Some(editing_id) = edit_mnemon_id() {
+                {
+                    // Find the mnemon with work to pre-fill the form
+                    let all_mnemons_with_works = mnemons_with_works();
+                    if let Some(mnemon_with_work) = all_mnemons_with_works.iter().find(|mw| mw.mnemon.id == editing_id) {
+                        let initial_form = AddMnemonForm::from_mnemon_for_edit(&mnemon_with_work.mnemon, &mnemon_with_work.work);
+                        rsx! {
+                            EditMnemonFlow {
+                                initial_form: initial_form,
+                                on_save: move |form: AddMnemonForm| {
+                                    // Split notes by newlines
+                                    let notes: Vec<String> = form
+                                        .notes
+                                        .lines()
+                                        .map(|s| s.trim().to_string())
+                                        .filter(|s| !s.is_empty())
+                                        .collect();
+
+                                    // Update finished_date
+                                    let finished_date = if form.finished_date.is_empty() {
+                                        None
+                                    } else {
+                                        Some(form.finished_date.clone())
+                                    };
+
+                                    // Update the mnemon
+                                    app_state.write().edit_mnemon(
+                                        editing_id,
+                                        finished_date,
+                                        form.feelings.clone(),
+                                        notes,
+                                    );
+
+                                    info!("Updated mnemon: {}", editing_id);
+                                    edit_mnemon_id.set(None);
+                                },
+                                on_cancel: move |_| {
+                                    edit_mnemon_id.set(None);
+                                }
+                            }
+                        }
+                    } else {
+                        rsx! {}
+                    }
+                }
+            }
+
             // Undo toast for pending deletions
             if let Some(_pending) = pending_delete() {
                 UndoToast {
@@ -537,6 +633,7 @@ fn Hero(
     details_open: bool,
     on_add_click: EventHandler<()>,
     on_details_toggle: EventHandler<()>,
+    on_edit: EventHandler<Uuid>,
     on_delete: EventHandler<Uuid>,
 ) -> Element {
     use rand::seq::SliceRandom;
@@ -731,6 +828,7 @@ fn Hero(
 
                     MemoryDetails {
                         mnemon_with_work: mnemon_with_work.clone(),
+                        on_edit: on_edit,
                         on_delete: on_delete,
                     }
                 }
@@ -816,7 +914,7 @@ fn UndoToast(message: String, on_undo: EventHandler<()>, on_timeout: EventHandle
 // =============================================================================
 
 #[component]
-fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_delete: EventHandler<Uuid>) -> Element {
+fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_edit: EventHandler<Uuid>, on_delete: EventHandler<Uuid>) -> Element {
     let work = &mnemon_with_work.work;
     let mnemon = &mnemon_with_work.mnemon;
     let mnemon_id = mnemon.id;
@@ -827,6 +925,36 @@ fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_delete: EventHandler<Uuid>
     rsx! {
         div {
             class: "h-full overflow-y-auto px-8 py-6 flex flex-col",
+
+            // Header with Edit button
+            div {
+                class: "mb-6 flex items-center justify-between",
+                
+                h2 {
+                    class: "text-2xl font-bold text-white",
+                    "{work.title_en}"
+                }
+
+                button {
+                    class: "px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-2",
+                    onclick: move |_| on_edit.call(mnemon_id),
+                    
+                    // Edit icon
+                    svg {
+                        class: "w-4 h-4",
+                        fill: "none",
+                        stroke: "currentColor",
+                        stroke_width: "2",
+                        view_box: "0 0 24 24",
+                        path {
+                            stroke_linecap: "round",
+                            stroke_linejoin: "round",
+                            d: "M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                        }
+                    }
+                    span { "Edit" }
+                }
+            }
 
             // Audio player stub (only if theme music exists)
             if work.theme_music_local_uri.is_some() {
@@ -1568,6 +1696,168 @@ fn Step1ManualEntry(
                     },
                     span { "Next" }
                     span { "→" }
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// EDIT MNEMON FLOW
+// =============================================================================
+
+#[component]
+fn EditMnemonFlow(
+    initial_form: AddMnemonForm,
+    on_save: EventHandler<AddMnemonForm>,
+    on_cancel: EventHandler<()>,
+) -> Element {
+    let mut form = use_signal(|| initial_form);
+
+    rsx! {
+        // Modal overlay
+        div {
+            class: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm",
+            onclick: move |_| on_cancel.call(()),
+
+            // Modal content
+            div {
+                class: "bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
+                onclick: move |e| e.stop_propagation(),
+
+                div {
+                    class: "p-8",
+
+                    // Header
+                    div {
+                        class: "mb-6",
+                        h2 {
+                            class: "text-3xl font-bold text-white mb-2",
+                            "Edit mnemon"
+                        }
+                        p {
+                            class: "text-gray-400",
+                            "Update your feelings, notes, and finished date"
+                        }
+                    }
+
+                    // Work info (read-only display)
+                    div {
+                        class: "mb-6 p-4 bg-gray-700/50 rounded-lg",
+                        div {
+                            class: "flex items-center gap-2 mb-2",
+                            span {
+                                class: "text-xl",
+                                "{form().work_type.unwrap_or(WorkType::Movie).icon()}"
+                            }
+                            h3 {
+                                class: "text-lg font-semibold text-white",
+                                "{form().title}"
+                            }
+                        }
+                        if !form().year.is_empty() {
+                            p {
+                                class: "text-gray-400 text-sm",
+                                "Released: {form().year}"
+                            }
+                        }
+                    }
+
+                    // Notes
+                    div {
+                        class: "mb-6",
+                        label {
+                            class: "block text-white text-sm font-semibold mb-2",
+                            "Notes"
+                        }
+                        textarea {
+                            class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-white focus:outline-none min-h-[120px] resize-y",
+                            placeholder: "Add your thoughts, memories, or reflections...",
+                            value: "{form().notes}",
+                            oninput: move |e| {
+                                form.with_mut(|f| f.notes = e.value());
+                            }
+                        }
+                    }
+
+                    // Feelings
+                    div {
+                        class: "mb-6",
+                        label {
+                            class: "block text-white text-sm font-semibold mb-3",
+                            "Feelings"
+                            span { class: "text-gray-400 ml-2 text-xs", "(choose up to {MAX_FEELINGS})" }
+                        }
+                        div {
+                            class: "flex flex-wrap gap-2",
+                            for (feeling_name, feeling_emoji) in FEELINGS {
+                                {
+                                    let is_selected = form().feelings.contains(&feeling_name.to_string());
+                                    let feelings_count = form().feelings.len();
+                                    let can_add = feelings_count < MAX_FEELINGS;
+
+                                    rsx! {
+                                        button {
+                                            class: if is_selected {
+                                                "px-4 py-2 bg-transparent text-white rounded-full border-2 border-white text-sm font-medium"
+                                            } else if can_add {
+                                                "px-4 py-2 bg-gray-700 text-gray-300 rounded-full border-2 border-gray-600 hover:border-gray-500 text-sm font-medium cursor-pointer"
+                                            } else {
+                                                "px-4 py-2 bg-gray-800 text-gray-500 rounded-full border-2 border-gray-700 text-sm font-medium cursor-not-allowed opacity-50"
+                                            },
+                                            disabled: !is_selected && !can_add,
+                                            onclick: move |_| {
+                                                form.with_mut(|f| {
+                                                    if is_selected {
+                                                        f.feelings.retain(|s| s != feeling_name);
+                                                    } else if can_add {
+                                                        f.feelings.push(feeling_name.to_string());
+                                                    }
+                                                });
+                                            },
+                                            span { class: "mr-1", "{feeling_emoji}" }
+                                            span { "{feeling_name}" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Finished date
+                    div {
+                        class: "mb-8",
+                        label {
+                            class: "block text-white text-sm font-semibold mb-2",
+                            "Finished date"
+                            span { class: "text-gray-400 ml-1 text-xs", "(when you completed it)" }
+                        }
+                        input {
+                            class: "w-full px-4 py-3 bg-gray-700 text-white rounded-lg border-2 border-gray-600 focus:border-white focus:outline-none",
+                            r#type: "date",
+                            value: "{form().finished_date}",
+                            oninput: move |e| {
+                                form.with_mut(|f| f.finished_date = e.value());
+                            }
+                        }
+                    }
+
+                    // Actions
+                    div {
+                        class: "flex gap-3 justify-end",
+                        button {
+                            class: "px-6 py-3 text-gray-300 hover:text-white font-medium",
+                            onclick: move |_| on_cancel.call(()),
+                            "Cancel"
+                        }
+                        button {
+                            class: "px-6 py-3 bg-transparent border-2 border-white hover:bg-white/10 text-white rounded-lg font-medium",
+                            onclick: move |_| {
+                                on_save.call(form());
+                            },
+                            "Save Changes"
+                        }
+                    }
                 }
             }
         }
