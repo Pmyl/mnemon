@@ -255,7 +255,7 @@ impl AppState {
             // Persist asynchronously
             spawn(async move {
                 if let Err(e) = storage::save_mnemon(&mnemon_clone).await {
-                    info!("Failed to persist updated mnemon: {}", e);
+                    tracing::error!("Failed to persist updated mnemon: {}", e);
                 }
             });
         }
@@ -1718,7 +1718,15 @@ fn EditMnemonFlow(
         // Modal overlay
         div {
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm",
+            role: "dialog",
+            "aria-modal": "true",
+            "aria-labelledby": "edit-modal-title",
             onclick: move |_| on_cancel.call(()),
+            onkeydown: move |e| {
+                if e.key() == Key::Escape {
+                    on_cancel.call(());
+                }
+            },
 
             // Modal content
             div {
@@ -1732,6 +1740,7 @@ fn EditMnemonFlow(
                     div {
                         class: "mb-6",
                         h2 {
+                            id: "edit-modal-title",
                             class: "text-3xl font-bold text-white mb-2",
                             "Edit mnemon"
                         }
@@ -1748,7 +1757,7 @@ fn EditMnemonFlow(
                             class: "flex items-center gap-2 mb-2",
                             span {
                                 class: "text-xl",
-                                "{form().work_type.unwrap_or(WorkType::Movie).icon()}"
+                                "{form().work_type.as_ref().map(|wt| wt.icon()).unwrap_or(\"📄\")}"
                             }
                             h3 {
                                 class: "text-lg font-semibold text-white",
