@@ -559,10 +559,7 @@ fn Hero(
         let mut notes = mnemon_notes.clone();
         notes.shuffle(&mut rng);
         current_note_index.set(0);
-        notes
-            .into_iter()
-            .take(HERO_NOTES_TO_DISPLAY)
-            .collect::<Vec<String>>()
+        notes.into_iter().collect::<Vec<String>>()
     });
 
     // Rotate through notes with fade animation (only when details closed)
@@ -643,7 +640,7 @@ fn Hero(
 
                     // Background cover image with overlay
                     div {
-                        class: "absolute inset-0 z-0",
+                        class: "absolute inset-0 z-0 bg-yellow-300",
                         style: if let Some(ref url) = work.cover_image_local_uri {
                             format!("background-image: url('{}'); background-size: cover; background-position: center; background-repeat: no-repeat;", url)
                         } else {
