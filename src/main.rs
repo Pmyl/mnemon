@@ -291,6 +291,8 @@ impl AddMnemonForm {
     }
 
     /// Create a form from an existing mnemon for editing (only editable fields)
+    /// Note: work-related fields (work_type, title, year, provider_ref, etc.) are populated
+    /// for display purposes only in the edit modal and cannot be modified.
     fn from_mnemon_for_edit(mnemon: &Mnemon, work: &Work) -> Self {
         Self {
             work_type: Some(work.work_type.clone()),
@@ -1721,7 +1723,6 @@ fn EditMnemonFlow(
             role: "dialog",
             "aria-modal": "true",
             "aria-labelledby": "edit-modal-title",
-            onclick: move |_| on_cancel.call(()),
             onkeydown: move |e| {
                 if e.key() == Key::Escape {
                     on_cancel.call(());
@@ -1731,7 +1732,6 @@ fn EditMnemonFlow(
             // Modal content
             div {
                 class: "bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
-                onclick: move |e| e.stop_propagation(),
 
                 div {
                     class: "p-8",
