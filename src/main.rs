@@ -162,10 +162,9 @@ impl AppState {
         let new_index = self.mnemons.read().len();
         self.mnemons.write().push(mnemon);
 
-        // Reshuffle existing indices, then append the new mnemon's index at the end
+        // Add new mnemon's index at the end without reshuffling existing indices
+        // This preserves the user's current viewing position
         let mut indices = self.shuffled_indices.write();
-        let mut rng = rand::thread_rng();
-        indices.shuffle(&mut rng);
         indices.push(new_index);
         let shuffled_position = indices.len() - 1;
         drop(indices);
@@ -584,9 +583,12 @@ fn Hero(
             note_visible.set(false);
             gloo_timers::future::TimeoutFuture::new(NOTE_FADE_TRANSITION_MS).await;
 
-            // Switch to next note
-            let next_idx = (idx + 1) % notes.len();
-            current_note_index.set(next_idx);
+            // Switch to next note - guard against empty notes to prevent division by zero
+            let notes_len = notes.len();
+            if notes_len > 0 {
+                let next_idx = (idx + 1) % notes_len;
+                current_note_index.set(next_idx);
+            }
 
             // Fade in
             note_visible.set(true);

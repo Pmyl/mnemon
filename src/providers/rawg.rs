@@ -133,12 +133,12 @@ impl RawgClient {
                 // In browser/WASM, when RAWG returns 401 for invalid API key,
                 // the browser's CORS policy blocks the response and reqwest
                 // reports it as "error sending request" before we can check status.
-                // We need to treat this as an auth error, not a network error.
+                // However, this could also be a genuine network error.
                 if err_msg.contains("error sending request") {
-                    info!("Detected 'error sending request' - likely CORS-blocked 401 from RAWG");
+                    info!("Detected 'error sending request' - could be CORS-blocked 401 or network issue");
                     ProviderError::ApiError {
                         status: 401,
-                        message: "Invalid or missing API key".to_string(),
+                        message: "Request failed. Please verify your API key is correct, or check your network connection.".to_string(),
                     }
                 } else if err_msg.contains("401") || err_msg.contains("Unauthorized") {
                     ProviderError::ApiError {
