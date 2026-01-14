@@ -552,20 +552,26 @@ fn Hero(
     let mut current_note_index = use_signal(|| 0usize);
     let mut note_visible = use_signal(|| true);
 
-    // Selected notes - updates when mnemon changes
+    // Shuffled notes - all notes in random order
     let mnemon_notes = mnemon.notes.clone();
-    let selected_notes = use_memo(move || {
+    let mut selected_notes = use_signal(|| {
         let mut rng = thread_rng();
         let mut notes = mnemon_notes.clone();
         notes.shuffle(&mut rng);
-        current_note_index.set(0);
         notes
-            .into_iter()
-            .take(HERO_NOTES_TO_DISPLAY)
-            .collect::<Vec<String>>()
+    });
+    
+    // Reset when mnemon changes
+    use_effect(move || {
+        current_note_index.set(0);
+        let mut rng = thread_rng();
+        let mut notes = mnemon_notes.clone();
+        notes.shuffle(&mut rng);
+        selected_notes.set(notes);
     });
 
     // Rotate through notes with fade animation (only when details closed)
+    // Reshuffle notes when wrapping around to start for true randomization
     use_effect(move || {
         let notes = selected_notes();
         if notes.is_empty() || details_open {
@@ -587,6 +593,14 @@ fn Hero(
             // Switch to next note
             let next_idx = (idx + 1) % notes.len();
             current_note_index.set(next_idx);
+            
+            // If we wrapped around to the beginning (and we weren't already at 0), reshuffle
+            if next_idx == 0 && idx > 0 {
+                let mut rng = thread_rng();
+                let mut shuffled_notes = notes.clone();
+                shuffled_notes.shuffle(&mut rng);
+                selected_notes.set(shuffled_notes);
+            }
 
             // Fade in
             note_visible.set(true);
