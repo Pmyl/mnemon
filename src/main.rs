@@ -268,7 +268,7 @@ impl AppState {
 
 /// Form data for adding a mnemon
 #[derive(Clone, PartialEq, Debug, Default)]
-struct AddMnemonForm {
+struct MnemonForm {
     // Step 1 fields
     work_type: Option<WorkType>,
     title: String,
@@ -285,7 +285,7 @@ struct AddMnemonForm {
     notes: String,
 }
 
-impl AddMnemonForm {
+impl MnemonForm {
     fn is_step1_valid(&self) -> bool {
         self.work_type.is_some() && !self.title.trim().is_empty()
     }
@@ -441,7 +441,6 @@ fn App() -> Element {
                         },
                         on_edit: move |mnemon_id: Uuid| {
                             edit_mnemon_id.set(Some(mnemon_id));
-                            details_open.set(false);
                         },
                         on_delete: move |mnemon_id: Uuid| {
                             // Remove from memory and store for potential undo
@@ -472,7 +471,7 @@ fn App() -> Element {
                     on_settings: move |_| {
                         show_settings.set(true);
                     },
-                    on_save: move |form: AddMnemonForm| {
+                    on_save: move |form: MnemonForm| {
                         // Parse year
                         let year = form.year.trim().parse::<u16>().ok();
 
@@ -548,11 +547,11 @@ fn App() -> Element {
                     // Find the mnemon with work to pre-fill the form
                     let all_mnemons_with_works = mnemons_with_works();
                     if let Some(mnemon_with_work) = all_mnemons_with_works.iter().find(|mw| mw.mnemon.id == editing_id) {
-                        let initial_form = AddMnemonForm::from_mnemon_for_edit(&mnemon_with_work.mnemon, &mnemon_with_work.work);
+                        let initial_form = MnemonForm::from_mnemon_for_edit(&mnemon_with_work.mnemon, &mnemon_with_work.work);
                         rsx! {
                             EditMnemonFlow {
                                 initial_form: initial_form,
-                                on_save: move |form: AddMnemonForm| {
+                                on_save: move |form: MnemonForm| {
                                     // Split notes by newlines
                                     let notes: Vec<String> = form
                                         .notes
@@ -1120,11 +1119,11 @@ fn EmptyState(on_click: EventHandler<()>) -> Element {
 
 #[component]
 fn AddMnemonFlow(
-    on_save: EventHandler<AddMnemonForm>,
+    on_save: EventHandler<MnemonForm>,
     on_cancel: EventHandler<()>,
     on_settings: EventHandler<()>,
 ) -> Element {
-    let mut form = use_signal(AddMnemonForm::default);
+    let mut form = use_signal(MnemonForm::default);
     let mut current_step = use_signal(|| 1);
 
     rsx! {
@@ -1171,8 +1170,8 @@ fn AddMnemonFlow(
 
 #[component]
 fn Step1ManualEntry(
-    form: AddMnemonForm,
-    on_next: EventHandler<AddMnemonForm>,
+    form: MnemonForm,
+    on_next: EventHandler<MnemonForm>,
     on_cancel: EventHandler<()>,
     on_settings: EventHandler<()>,
 ) -> Element {
@@ -1710,8 +1709,8 @@ fn Step1ManualEntry(
 
 #[component]
 fn EditMnemonFlow(
-    initial_form: AddMnemonForm,
-    on_save: EventHandler<AddMnemonForm>,
+    initial_form: MnemonForm,
+    on_save: EventHandler<MnemonForm>,
     on_cancel: EventHandler<()>,
 ) -> Element {
     let mut form = use_signal(|| initial_form);
@@ -2149,9 +2148,9 @@ fn SettingsModal(paused: Signal<bool>, on_close: EventHandler<()>) -> Element {
 
 #[component]
 fn Step2Personalize(
-    form: AddMnemonForm,
-    on_save: EventHandler<AddMnemonForm>,
-    on_back: EventHandler<AddMnemonForm>,
+    form: MnemonForm,
+    on_save: EventHandler<MnemonForm>,
+    on_back: EventHandler<MnemonForm>,
 ) -> Element {
     let mut local_form = use_signal(|| form);
 
