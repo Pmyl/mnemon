@@ -51,9 +51,6 @@ pub const SEARCH_PAGE_SIZE: usize = 10;
 /// Maximum number of feelings that can be selected per mnemon
 pub const MAX_FEELINGS: usize = 5;
 
-/// Number of notes to display in the hero rotation
-pub const HERO_NOTES_TO_DISPLAY: usize = 2;
-
 // =============================================================================
 // FEELINGS TAXONOMY
 // =============================================================================
