@@ -936,19 +936,7 @@ fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_edit: EventHandler<Uuid>, 
                     class: "px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-2",
                     onclick: move |_| on_edit.call(mnemon_id),
                     
-                    // Edit icon
-                    svg {
-                        class: "w-4 h-4",
-                        fill: "none",
-                        stroke: "currentColor",
-                        stroke_width: "2",
-                        view_box: "0 0 24 24",
-                        path {
-                            stroke_linecap: "round",
-                            stroke_linejoin: "round",
-                            d: "M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                        }
-                    }
+                    EditIcon {}
                     span { "Edit" }
                 }
             }
@@ -1112,6 +1100,25 @@ fn EmptyState(on_click: EventHandler<()>) -> Element {
 // =============================================================================
 // REUSABLE FORM COMPONENTS
 // =============================================================================
+
+/// Edit icon SVG component
+#[component]
+fn EditIcon() -> Element {
+    rsx! {
+        svg {
+            class: "w-4 h-4",
+            fill: "none",
+            stroke: "currentColor",
+            stroke_width: "2",
+            view_box: "0 0 24 24",
+            path {
+                stroke_linecap: "round",
+                stroke_linejoin: "round",
+                d: "M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+            }
+        }
+    }
+}
 
 /// Reusable Notes textarea component
 #[component]
