@@ -568,6 +568,8 @@ fn Hero(
     use_effect(move || {
         let notes = selected_notes();
         if notes.is_empty() || details_open {
+            // Reset note index when notes become empty
+            current_note_index.set(0);
             return;
         }
 
@@ -584,10 +586,14 @@ fn Hero(
             gloo_timers::future::TimeoutFuture::new(NOTE_FADE_TRANSITION_MS).await;
 
             // Switch to next note - guard against empty notes to prevent division by zero
+            // Notes can become empty if mnemon changes during the async wait
             let notes_len = notes.len();
             if notes_len > 0 {
                 let next_idx = (idx + 1) % notes_len;
                 current_note_index.set(next_idx);
+            } else {
+                // Reset index if notes became empty
+                current_note_index.set(0);
             }
 
             // Fade in
