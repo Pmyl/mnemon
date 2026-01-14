@@ -306,6 +306,24 @@ impl MnemonForm {
             notes: mnemon.notes.join("\n"),
         }
     }
+
+    /// Parse notes string into a vector of non-empty lines
+    fn parse_notes(&self) -> Vec<String> {
+        self.notes
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    /// Parse finished_date string into Option (empty string becomes None)
+    fn parse_finished_date(&self) -> Option<String> {
+        if self.finished_date.is_empty() {
+            None
+        } else {
+            Some(self.finished_date.clone())
+        }
+    }
 }
 
 // =============================================================================
@@ -511,20 +529,9 @@ fn App() -> Element {
                             app_state.write().add_work(work)
                         };
 
-                        // Split notes by newlines
-                        let notes: Vec<String> = form
-                            .notes
-                            .lines()
-                            .map(|s| s.trim().to_string())
-                            .filter(|s| !s.is_empty())
-                            .collect();
-
-                        // Create mnemon
-                        let finished_date = if form.finished_date.is_empty() {
-                            None
-                        } else {
-                            Some(form.finished_date.clone())
-                        };
+                        // Parse form data using helper methods
+                        let notes = form.parse_notes();
+                        let finished_date = form.parse_finished_date();
 
                         let mnemon = Mnemon::new(work_id, finished_date, form.feelings.clone(), notes);
                         info!("Created new mnemon for work_id: {}", work_id);
@@ -552,20 +559,9 @@ fn App() -> Element {
                             EditMnemonFlow {
                                 initial_form: initial_form,
                                 on_save: move |form: MnemonForm| {
-                                    // Split notes by newlines
-                                    let notes: Vec<String> = form
-                                        .notes
-                                        .lines()
-                                        .map(|s| s.trim().to_string())
-                                        .filter(|s| !s.is_empty())
-                                        .collect();
-
-                                    // Update finished_date
-                                    let finished_date = if form.finished_date.is_empty() {
-                                        None
-                                    } else {
-                                        Some(form.finished_date.clone())
-                                    };
+                                    // Parse form data using helper methods
+                                    let notes = form.parse_notes();
+                                    let finished_date = form.parse_finished_date();
 
                                     // Update the mnemon
                                     app_state.write().edit_mnemon(
