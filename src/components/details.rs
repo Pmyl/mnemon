@@ -7,7 +7,11 @@ use crate::app_state::MnemonWithWork;
 use crate::components::EditIcon;
 
 #[component]
-pub fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_edit: EventHandler<Uuid>, on_delete: EventHandler<Uuid>) -> Element {
+pub fn MemoryDetails(
+    mnemon_with_work: MnemonWithWork,
+    on_edit: EventHandler<Uuid>,
+    on_delete: EventHandler<Uuid>,
+) -> Element {
     let work = &mnemon_with_work.work;
     let mnemon = &mnemon_with_work.mnemon;
     let mnemon_id = mnemon.id;
@@ -22,7 +26,7 @@ pub fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_edit: EventHandler<Uui
             // Header with Edit button
             div {
                 class: "mb-6 flex items-center justify-between",
-                
+
                 h2 {
                     class: "text-2xl font-bold text-white",
                     "{work.title_en}"
@@ -31,7 +35,7 @@ pub fn MemoryDetails(mnemon_with_work: MnemonWithWork, on_edit: EventHandler<Uui
                 button {
                     class: "px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-2",
                     onclick: move |_| on_edit.call(mnemon_id),
-                    
+
                     EditIcon {}
                     span { "Edit" }
                 }

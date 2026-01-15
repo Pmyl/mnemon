@@ -12,7 +12,7 @@ use crate::utils::calculate_reading_time;
 
 #[component]
 pub fn Hero(
-    mnemon_with_work: MnemonWithWork,
+    mnemon_with_work: ReadSignal<MnemonWithWork>,
     is_transitioning: bool,
     details_open: bool,
     on_add_click: EventHandler<()>,
@@ -20,8 +20,8 @@ pub fn Hero(
     on_edit: EventHandler<Uuid>,
     on_delete: EventHandler<Uuid>,
 ) -> Element {
-    let work = mnemon_with_work.work.clone();
-    let mnemon = mnemon_with_work.mnemon.clone();
+    let work = mnemon_with_work().work.clone();
+    let mnemon = mnemon_with_work().mnemon.clone();
 
     // Measured height of the title bar content
     let mut title_bar_height = use_signal(|| 150.0f64); // Default fallback
@@ -31,10 +31,9 @@ pub fn Hero(
     let mut note_visible = use_signal(|| true);
 
     // Selected notes - updates when mnemon changes
-    let mnemon_notes = mnemon.notes.clone();
     let selected_notes = use_memo(move || {
         let mut rng = thread_rng();
-        let mut notes = mnemon_notes.clone();
+        let mut notes = mnemon_with_work().mnemon.notes.clone();
         notes.shuffle(&mut rng);
         current_note_index.set(0);
         notes.into_iter().collect::<Vec<String>>()
@@ -43,7 +42,7 @@ pub fn Hero(
     // Rotate through notes with fade animation (only when details closed)
     use_effect(move || {
         let notes = selected_notes();
-        if notes.is_empty() || details_open {
+        if notes.is_empty() {
             return;
         }
 
@@ -208,7 +207,7 @@ pub fn Hero(
                     style: "height: calc(100vh - {visible_height}px);",
 
                     MemoryDetails {
-                        mnemon_with_work: mnemon_with_work.clone(),
+                        mnemon_with_work: mnemon_with_work.read().clone(),
                         on_edit: on_edit,
                         on_delete: on_delete,
                     }
