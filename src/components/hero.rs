@@ -20,8 +20,8 @@ pub fn Hero(
     on_edit: EventHandler<Uuid>,
     on_delete: EventHandler<Uuid>,
 ) -> Element {
-    let work = mnemon_with_work().work.clone();
-    let mnemon = mnemon_with_work().mnemon.clone();
+    let work = mnemon_with_work().work;
+    let mnemon = mnemon_with_work().mnemon;
 
     // Measured height of the title bar content
     let mut title_bar_height = use_signal(|| 150.0f64); // Default fallback
