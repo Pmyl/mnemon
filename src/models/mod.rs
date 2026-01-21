@@ -1,5 +1,3 @@
-//! Data models for Mnemon
-
 mod mnemon;
 mod provider;
 mod search;

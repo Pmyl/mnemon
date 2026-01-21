@@ -1,11 +1,8 @@
-//! Reusable form input components
-
 use dioxus::prelude::*;
 
 use crate::constants::*;
 use crate::forms::MnemonForm;
 
-/// Edit icon SVG component
 #[component]
 pub fn EditIcon() -> Element {
     rsx! {
@@ -24,7 +21,6 @@ pub fn EditIcon() -> Element {
     }
 }
 
-/// Reusable Notes textarea component
 #[component]
 pub fn NotesInput(form: Signal<MnemonForm>) -> Element {
     rsx! {
@@ -46,7 +42,6 @@ pub fn NotesInput(form: Signal<MnemonForm>) -> Element {
     }
 }
 
-/// Reusable Feelings selector component
 #[component]
 pub fn FeelingsSelector(form: Signal<MnemonForm>) -> Element {
     rsx! {
@@ -95,7 +90,6 @@ pub fn FeelingsSelector(form: Signal<MnemonForm>) -> Element {
     }
 }
 
-/// Reusable Finished date input component
 #[component]
 pub fn FinishedDateInput(form: Signal<MnemonForm>) -> Element {
     rsx! {

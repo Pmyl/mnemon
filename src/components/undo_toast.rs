@@ -1,25 +1,24 @@
-//! Undo toast component for deletions
-
 use dioxus::prelude::*;
 
 use crate::constants::*;
 use crate::models::Mnemon;
 
-/// Data for a pending deletion that can be undone
 #[derive(Clone, PartialEq, Debug)]
 pub struct PendingDelete {
     pub mnemon: Mnemon,
     pub original_idx: usize,
 }
 
-/// Update interval for undo toast progress bar (ms)
 const UNDO_PROGRESS_INTERVAL_MS: u32 = 50;
 
 #[component]
-pub fn UndoToast(message: String, on_undo: EventHandler<()>, on_timeout: EventHandler<()>) -> Element {
+pub fn UndoToast(
+    message: String,
+    on_undo: EventHandler<()>,
+    on_timeout: EventHandler<()>,
+) -> Element {
     let mut progress = use_signal(|| 100.0f64);
 
-    // Animate progress bar and handle timeout using gloo_timers
     use_effect(move || {
         spawn(async move {
             let steps = UNDO_TIMEOUT_MS / UNDO_PROGRESS_INTERVAL_MS;
@@ -43,7 +42,6 @@ pub fn UndoToast(message: String, on_undo: EventHandler<()>, on_timeout: EventHa
             div {
                 class: "bg-gray-800 border border-white/20 rounded-lg shadow-2xl overflow-hidden min-w-80",
 
-                // Content
                 div {
                     class: "px-4 py-3 flex items-center justify-between gap-4",
 
@@ -59,7 +57,6 @@ pub fn UndoToast(message: String, on_undo: EventHandler<()>, on_timeout: EventHa
                     }
                 }
 
-                // Progress bar (depletes from right to left)
                 div {
                     class: "h-1 bg-white/10",
 

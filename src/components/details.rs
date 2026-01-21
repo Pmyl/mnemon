@@ -1,5 +1,3 @@
-//! Memory details component
-
 use dioxus::prelude::*;
 use uuid::Uuid;
 
@@ -16,14 +14,12 @@ pub fn MemoryDetails(
     let mnemon = &mnemon_with_work.mnemon;
     let mnemon_id = mnemon.id;
 
-    // Stubbed audio state
     let mut is_playing = use_signal(|| false);
 
     rsx! {
         div {
             class: "h-full overflow-y-auto px-8 py-6 flex flex-col",
 
-            // Header with Edit button
             div {
                 class: "mb-6 flex items-center justify-between",
 
@@ -41,7 +37,6 @@ pub fn MemoryDetails(
                 }
             }
 
-            // Audio player stub (only if theme music exists)
             if work.theme_music_local_uri.is_some() {
                 div {
                     class: "mb-6 flex items-center gap-4",
@@ -59,7 +54,6 @@ pub fn MemoryDetails(
                     div {
                         class: "flex-1",
 
-                        // Progress bar stub
                         div {
                             class: "h-1 bg-white/20 rounded-full overflow-hidden",
                             div {
@@ -76,7 +70,6 @@ pub fn MemoryDetails(
                 }
             }
 
-            // Feelings chips
             if !mnemon.feelings.is_empty() {
                 div {
                     class: "mb-6",
@@ -98,7 +91,6 @@ pub fn MemoryDetails(
                 }
             }
 
-            // Finished date
             if let Some(ref finished_date) = mnemon.finished_date {
                 div {
                     class: "mb-6",
@@ -115,7 +107,6 @@ pub fn MemoryDetails(
                 }
             }
 
-            // Notes
             if !mnemon.notes.is_empty() {
                 div {
                     class: "mb-6",
@@ -137,7 +128,6 @@ pub fn MemoryDetails(
                 }
             }
 
-            // Empty state if no details
             if mnemon.feelings.is_empty() && mnemon.finished_date.is_none() && mnemon.notes.is_empty() && work.theme_music_local_uri.is_none() {
                 div {
                     class: "flex items-center justify-center flex-1 text-white/40 italic",
@@ -145,10 +135,8 @@ pub fn MemoryDetails(
                 }
             }
 
-            // Spacer to push delete button to bottom
             div { class: "flex-1" }
 
-            // Delete button
             div {
                 class: "pt-6 border-t border-white/10",
 

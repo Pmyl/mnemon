@@ -1,5 +1,3 @@
-//! UI Components for the Mnemon application
-
 pub mod add_mnemon;
 pub mod details;
 pub mod edit_mnemon;

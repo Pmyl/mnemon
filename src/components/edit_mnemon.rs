@@ -1,5 +1,3 @@
-//! Edit mnemon flow component
-
 use dioxus::prelude::*;
 
 use crate::components::{FeelingsSelector, FinishedDateInput, NotesInput};
@@ -14,7 +12,6 @@ pub fn EditMnemonFlow(
     let form = use_signal(|| initial_form);
 
     rsx! {
-        // Modal overlay
         div {
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm",
             role: "dialog",
@@ -26,14 +23,12 @@ pub fn EditMnemonFlow(
                 }
             },
 
-            // Modal content
             div {
                 class: "bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
 
                 div {
                     class: "p-8",
 
-                    // Header
                     div {
                         class: "mb-6",
                         h2 {
@@ -47,7 +42,6 @@ pub fn EditMnemonFlow(
                         }
                     }
 
-                    // Work info (read-only display)
                     div {
                         class: "mb-6 p-4 bg-gray-700/50 rounded-lg",
                         div {
@@ -69,16 +63,12 @@ pub fn EditMnemonFlow(
                         }
                     }
 
-                    // Notes
                     NotesInput { form: form }
 
-                    // Feelings
                     FeelingsSelector { form: form }
 
-                    // Finished date
                     FinishedDateInput { form: form }
 
-                    // Actions
                     div {
                         class: "flex gap-3 justify-end",
                         button {

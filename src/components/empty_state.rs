@@ -1,5 +1,3 @@
-//! Empty state component shown when no mnemons exist
-
 use dioxus::prelude::*;
 
 #[component]
