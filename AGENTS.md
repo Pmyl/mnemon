@@ -9,7 +9,19 @@ These are the md files that you should read:
 
 If you are implementing a design feature, follow the guidelines in the WIREFRAMES.md file.
 
-At the beginning of each phase ask questions if you are unsure about the requirements or implementation details.
+Critical Rules
+1. Code Organization
+    Many small files over few large files
+    High cohesion, low coupling
+    200-400 lines typical, 800 max per file
+    Organize by feature/domain, not by type
+
+2. Code Style
+    No emojis in code, comments, or documentation
+    Immutability always - never mutate objects or arrays
+    No console.log in production code
+    Proper error handling with try/catch
+    Input validation with Zod or similar
 
 Assume I'm always running `dx serve`, no need to run `dx build`, `cargo check` is enough.
 
