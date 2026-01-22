@@ -8,6 +8,10 @@ pub const UNDO_TIMEOUT_MS: u32 = 5000;
 
 pub const HERO_TRANSITION_SETTLE_MS: u32 = 50;
 
+pub const GESTURE_LOCK_THRESHOLD: f64 = 10.0;
+
+pub const SWIPE_THRESHOLD: f64 = 50.0;
+
 pub const NOTE_MIN_READING_TIME_MS: u64 = 3_000;
 
 pub const NOTE_MAX_READING_TIME_MS: u64 = 8_000;

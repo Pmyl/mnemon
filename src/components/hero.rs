@@ -6,22 +6,25 @@ use rand::thread_rng;
 use uuid::Uuid;
 
 use crate::app_state::MnemonWithWork;
-use crate::components::MemoryDetails;
+use crate::components::{CarouselPosition, MemoryDetails};
 use crate::constants::*;
 use crate::utils::calculate_reading_time;
 
 #[component]
 pub fn Hero(
-    mnemon_with_work: ReadSignal<MnemonWithWork>,
-    is_transitioning: bool,
+    mnemon_with_work: MnemonWithWork,
+    #[props(default = CarouselPosition::Current)] carousel_position: CarouselPosition,
     details_open: bool,
-    on_add_click: EventHandler<()>,
-    on_details_toggle: EventHandler<()>,
-    on_edit: EventHandler<Uuid>,
-    on_delete: EventHandler<Uuid>,
+    #[props(default)] on_add_click: Option<EventHandler<()>>,
+    #[props(default)] on_details_toggle: Option<EventHandler<()>>,
+    #[props(default)] on_edit: Option<EventHandler<Uuid>>,
+    #[props(default)] on_delete: Option<EventHandler<Uuid>>,
 ) -> Element {
-    let work = mnemon_with_work().work;
-    let mnemon = mnemon_with_work().mnemon;
+    let work = mnemon_with_work.work.clone();
+    let mnemon = mnemon_with_work.mnemon.clone();
+    let mnemon_with_work_for_memo = mnemon_with_work.clone();
+    let mnemon_with_work_for_details = mnemon_with_work.clone();
+    let is_current = carousel_position == CarouselPosition::Current;
 
     // Measured height of the title bar content
     let mut title_bar_height = use_signal(|| 150.0f64); // Default fallback
@@ -33,14 +36,18 @@ pub fn Hero(
     // Selected notes - updates when mnemon changes
     let selected_notes = use_memo(move || {
         let mut rng = thread_rng();
-        let mut notes = mnemon_with_work().mnemon.notes.clone();
+        let mut notes = mnemon_with_work_for_memo.mnemon.notes.clone();
         notes.shuffle(&mut rng);
         current_note_index.set(0);
         notes.into_iter().collect::<Vec<String>>()
     });
 
-    // Rotate through notes with fade animation (only when details closed)
+    // Rotate through notes with fade animation (only when details closed and current position)
     use_effect(move || {
+        if !is_current {
+            return;
+        }
+
         let notes = selected_notes();
         if notes.is_empty() {
             return;
@@ -58,8 +65,14 @@ pub fn Hero(
             note_visible.set(false);
             gloo_timers::future::TimeoutFuture::new(NOTE_FADE_TRANSITION_MS).await;
 
-            // Switch to next note
-            let next_idx = (idx + 1) % notes.len();
+            // Re-read notes to ensure consistency after async operations
+            let current_notes = selected_notes();
+            if current_notes.is_empty() {
+                return;
+            }
+
+            // Switch to next note with bounds checking
+            let next_idx = (idx + 1) % current_notes.len();
             current_note_index.set(next_idx);
 
             // Fade in
@@ -73,24 +86,12 @@ pub fn Hero(
         notes.get(idx).cloned()
     });
 
-    // Horizontal transition for slideshow
-    let horizontal_transition = if is_transitioning {
-        format!(
-            "transform: translateX(-100%); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);",
-            HERO_TRANSITION_MS
-        )
-    } else {
-        format!(
-            "transform: translateX(0); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);",
-            HERO_TRANSITION_MS
-        )
-    };
-
     // Vertical slide for details reveal - slides up to show only title bar (using measured height)
     // Add 32px top padding so title doesn't sit flush at top of viewport
+    // Only apply to current carousel position
     let measured_height = title_bar_height();
     let visible_height = measured_height + 32.0;
-    let vertical_slide = if details_open {
+    let vertical_slide = if is_current && details_open {
         format!("transform: translateY(calc(-100% + {}px)); transition: transform {}ms cubic-bezier(0.4, 0.0, 0.2, 1);", visible_height, DETAILS_TRANSITION_MS)
     } else {
         format!(
@@ -103,7 +104,6 @@ pub fn Hero(
         // Container for hero + details (full viewport height, with hero stacked above details)
         div {
             class: "relative h-full w-full",
-            style: "{horizontal_transition}",
 
             // Sliding container (hero + details stacked vertically)
             div {
@@ -112,14 +112,20 @@ pub fn Hero(
 
                 // Hero section (full viewport height) - original layout preserved
                 div {
-                    class: "relative h-screen w-full cursor-pointer",
-                    onclick: move |_| on_add_click.call(()),
+                    class: if is_current { "relative h-screen w-full cursor-pointer" } else { "relative h-screen w-full" },
+                    onclick: move |_| {
+                        if is_current {
+                            if let Some(handler) = on_add_click {
+                                handler.call(());
+                            }
+                        }
+                    },
 
                     // Background cover image with overlay
                     div {
                         class: "absolute inset-0 z-0 bg-yellow-300",
                         style: if let Some(ref url) = work.cover_image_local_uri {
-                            format!("background-image: url('{}'); background-size: cover; background-position: center; background-repeat: no-repeat;", url)
+                            format!("background-image: url('{}'); background-size: cover; background-position: center; background-repeat: no-repeat; animation: kenBurns 45s ease-in-out infinite; will-change: transform;", url)
                         } else {
                             "background-color: #1a1a2e;".to_string()
                         },
@@ -191,25 +197,35 @@ pub fn Hero(
                     }
 
                     // Bottom click zone - toggles details (title bar area, uses measured height + top padding)
-                    div {
-                        class: "absolute bottom-0 left-0 right-0 z-30 cursor-pointer",
-                        style: "height: {visible_height}px;",
-                        onclick: move |e| {
-                            e.stop_propagation();
-                            on_details_toggle.call(());
-                        },
+                    // Only active for current carousel position
+                    if is_current {
+                        div {
+                            class: "absolute bottom-0 left-0 right-0 z-30 cursor-pointer",
+                            style: "height: {visible_height}px;",
+                            onclick: move |e| {
+                                e.stop_propagation();
+                                if let Some(handler) = on_details_toggle {
+                                    handler.call(());
+                                }
+                            },
+                        }
                     }
                 }
 
                 // Details section (below hero, same height as viewport minus visible title area)
-                div {
-                    class: "relative w-full bg-gray-900",
-                    style: "height: calc(100vh - {visible_height}px);",
+                // Only render for current carousel position
+                if is_current {
+                    if let (Some(edit_handler), Some(delete_handler)) = (on_edit, on_delete) {
+                        div {
+                            class: "relative w-full bg-gray-900",
+                            style: "height: calc(100vh - {visible_height}px);",
 
-                    MemoryDetails {
-                        mnemon_with_work: mnemon_with_work.read().clone(),
-                        on_edit: on_edit,
-                        on_delete: on_delete,
+                            MemoryDetails {
+                                mnemon_with_work: mnemon_with_work_for_details.clone(),
+                                on_edit: edit_handler,
+                                on_delete: delete_handler,
+                            }
+                        }
                     }
                 }
             }

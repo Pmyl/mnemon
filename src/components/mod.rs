@@ -1,4 +1,5 @@
 pub mod add_mnemon;
+pub mod carousel;
 pub mod details;
 pub mod edit_mnemon;
 pub mod empty_state;
@@ -8,10 +9,10 @@ pub mod settings;
 pub mod undo_toast;
 
 pub use add_mnemon::AddMnemonFlow;
+pub use carousel::{Carousel, CarouselPosition};
 pub use details::MemoryDetails;
 pub use edit_mnemon::EditMnemonFlow;
 pub use empty_state::EmptyState;
 pub use form_inputs::{EditIcon, FeelingsSelector, FinishedDateInput, NotesInput};
-pub use hero::Hero;
 pub use settings::SettingsModal;
 pub use undo_toast::{PendingDelete, UndoToast};

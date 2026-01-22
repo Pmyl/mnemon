@@ -24,7 +24,7 @@ pub fn EditMnemonFlow(
             },
 
             div {
-                class: "bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
+                class: "bg-gray-800 rounded-lg shadow-2xl max-w-full sm:max-w-2xl w-full mx-2 sm:mx-4 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto",
 
                 div {
                     class: "p-8",
