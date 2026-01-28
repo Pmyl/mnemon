@@ -24,10 +24,10 @@ pub fn EditMnemonFlow(
             },
 
             div {
-                class: "bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
+                class: "bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl mx-2 sm:mx-4 md:mx-auto max-h-[90vh] overflow-y-auto",
 
                 div {
-                    class: "p-8",
+                    class: "px-4 py-6 sm:p-8",
 
                     div {
                         class: "mb-6",

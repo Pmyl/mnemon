@@ -11,12 +11,53 @@ Located in `~/.claude/agents/`:
 | code-reviewer | Code review | After writing code |
 | refactor-cleaner | Dead code cleanup | Code maintenance |
 
-## Immediate Agent Usage
+## ⚠️ MANDATORY Agent Usage
 
-No user prompt needed:
-1. Complex feature requests - Use **planner** agent
-2. Code just written/modified - Use **code-reviewer** agent
-3. Architectural decision - Use **architect** agent
+**These are REQUIREMENTS, not suggestions. You MUST follow these rules automatically.**
+
+### 1. After Writing/Modifying Code
+**ALWAYS run code-reviewer agent immediately after making code changes.**
+- ✅ DO: Run code-reviewer as soon as code is written
+- ❌ DON'T: Wait for user to ask for code review
+- ❌ DON'T: Skip code review because "changes are small"
+
+### 2. After ANY Code Changes
+**ALWAYS run refactor-cleaner agent to check for:**
+- File size violations (files over 400 lines)
+- Dead code and unused imports
+- Duplication and cleanup opportunities
+- Clippy warnings
+
+### 3. Before Marking Tasks Complete
+**MANDATORY checklist before completing implementation:**
+- [ ] Run code-reviewer agent
+- [ ] Run refactor-cleaner agent
+- [ ] Check all modified files are under 400 lines
+- [ ] Fix all clippy warnings
+- [ ] If any file > 400 lines, extract logic into smaller files
+
+### 4. For Complex Features
+**Use planner agent proactively for:**
+- Multi-file changes
+- New features with multiple approaches
+- Architectural decisions
+- Refactoring that affects multiple components
+
+### 5. For Architectural Decisions
+**Use architect agent when:**
+- Choosing between patterns or technologies
+- Designing system interactions
+- Making decisions that affect multiple modules
+
+## Post-Implementation Protocol
+
+**REQUIRED STEPS - Execute automatically:**
+
+1. **Immediate:** Run code-reviewer (security, quality, best practices)
+2. **Immediate:** Run refactor-cleaner (file sizes, dead code, duplication)
+3. **If issues found:** Fix them before marking complete
+4. **Always:** Verify all files under 400 lines (800 absolute max)
+5. **Always:** Run `cargo clippy` and fix all warnings
 
 ## Parallel Task Execution
 
@@ -41,3 +82,14 @@ For complex problems, use split role sub-agents:
 - Security expert
 - Consistency reviewer
 - Redundancy checker
+
+---
+
+## Enforcement
+
+If you (Claude) skip these mandatory steps:
+1. The user will point it out (like they just did)
+2. You'll need to run the agents retroactively
+3. You'll waste time fixing what should have been caught immediately
+
+**Treat these rules as hard requirements, not optional suggestions.**

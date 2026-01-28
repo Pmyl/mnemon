@@ -8,6 +8,8 @@ pub const UNDO_TIMEOUT_MS: u32 = 5000;
 
 pub const HERO_TRANSITION_SETTLE_MS: u32 = 50;
 
+pub const MANUAL_NAV_PAUSE_MS: u32 = 5000;
+
 pub const NOTE_MIN_READING_TIME_MS: u64 = 3_000;
 
 pub const NOTE_MAX_READING_TIME_MS: u64 = 8_000;

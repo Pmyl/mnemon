@@ -23,7 +23,7 @@ pub fn SettingsModal(paused: Signal<bool>, on_close: EventHandler<()>) -> Elemen
 
             // Modal content
             div {
-                class: "bg-gray-800 rounded-lg shadow-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto",
+                class: "bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg mx-2 sm:mx-4 md:mx-auto max-h-[90vh] overflow-y-auto",
                 onclick: move |e| e.stop_propagation(),
 
                 // Header

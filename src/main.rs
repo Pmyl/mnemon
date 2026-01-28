@@ -9,10 +9,12 @@ mod components;
 mod constants;
 mod data;
 mod forms;
+mod hooks;
 mod models;
 mod providers;
 mod settings;
 mod storage;
+mod types;
 mod utils;
 
 use app_state::AppState;
@@ -20,6 +22,7 @@ use components::*;
 use constants::*;
 use forms::MnemonForm;
 use models::*;
+use types::Direction;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!(
@@ -60,12 +63,23 @@ fn App() -> Element {
     // Current mnemon index for hero display
     let mut current_index = use_signal(|| 0usize);
     let mut is_transitioning = use_signal(|| false);
+    let mut next_index = use_signal(|| Option::<usize>::None);
+    let mut transition_direction = use_signal(|| Direction::Forward);
 
     // Details view state
     let mut details_open = use_signal(|| false);
 
     // Auto-cycle pause state (controlled via Settings)
     let paused = use_signal(|| false);
+
+    // Pause auto-cycle temporarily after manual navigation
+    let mut pause_auto_cycle = use_signal(|| false);
+
+    // Cycle version - increments to restart auto-cycle timer
+    let mut cycle_version = use_signal(|| 0u32);
+
+    // Detect if device is mobile for touch gestures
+    let is_mobile = use_signal(utils::is_mobile_device);
 
     // Add flow state
     let mut show_add_flow = use_signal(|| false);
@@ -82,26 +96,111 @@ fn App() -> Element {
     // Get mnemons with works for display (in original order, indexed by shuffled_indices)
     let mnemons_with_works = use_memo(move || app_state.read().get_mnemons_with_works());
 
-    let current_mnemon_with_work = use_memo(move || {
+    // Helper to get mnemon by shuffled index
+    let get_mnemon_by_index = move |shuffled_pos: usize| -> Option<app_state::MnemonWithWork> {
         let all = mnemons_with_works();
         if all.is_empty() {
             return None;
         }
-        // current_index indexes into shuffled_indices, which gives us the actual mnemon index
-        let shuffled_pos = current_index();
         let state = app_state.read();
         let actual_index = state.get_shuffled_index(shuffled_pos)?;
         all.get(actual_index).cloned()
+    };
+
+    let current_mnemon_with_work = use_memo(move || {
+        get_mnemon_by_index(current_index())
+    });
+
+    let next_mnemon_with_work = use_memo(move || {
+        next_index().and_then(get_mnemon_by_index)
+    });
+
+    // Manual navigation function
+    let mut navigate = move |direction: Direction| {
+        if is_transitioning() {
+            return; // Debounce - prevent navigation during transition
+        }
+
+        let total = app_state.peek().mnemons_count();
+        if total == 0 {
+            return;
+        }
+
+        let next_idx = match direction {
+            Direction::Forward => (current_index() + 1) % total,
+            Direction::Backward => {
+                let current = current_index();
+                if current == 0 {
+                    total - 1
+                } else {
+                    current - 1
+                }
+            }
+        };
+
+        transition_direction.set(direction);
+        next_index.set(Some(next_idx));
+        is_transitioning.set(true);
+
+        // Restart auto-cycle timer (use wrapping to handle overflow)
+        let new_version = cycle_version.peek().wrapping_add(1);
+        cycle_version.set(new_version);
+
+        // Pause auto-cycle for 5 seconds after manual navigation
+        pause_auto_cycle.set(true);
+
+        spawn(async move {
+            // Wait for transition animation
+            gloo_timers::future::TimeoutFuture::new(HERO_TRANSITION_MS).await;
+
+            // Switch to next mnemon
+            current_index.set(next_idx);
+            next_index.set(None);
+
+            // End transition
+            gloo_timers::future::TimeoutFuture::new(HERO_TRANSITION_SETTLE_MS).await;
+            is_transitioning.set(false);
+
+            // Resume auto-cycle after configured pause duration
+            gloo_timers::future::TimeoutFuture::new(MANUAL_NAV_PAUSE_MS).await;
+            pause_auto_cycle.set(false);
+        });
+    };
+
+    // Track previous details state to detect transitions
+    let mut prev_details_open = use_signal(|| false);
+
+    // Restart timer when details close (transition from open to closed)
+    use_effect(move || {
+        let current = details_open();
+
+        // Use with_mut to avoid reactive read causing infinite loop
+        prev_details_open.with_mut(|previous| {
+            // Only increment when transitioning from open to closed
+            if *previous && !current {
+                let new_version = cycle_version.peek().wrapping_add(1);
+                cycle_version.set(new_version);
+            }
+            *previous = current;
+        });
     });
 
     // Auto-advance to next mnemon after HERO_AUTO_CYCLE_MS (pauses when details open)
     use_effect(move || {
         spawn(async move {
             loop {
+                // Capture version at start of wait cycle
+                let version_at_start = cycle_version();
+
                 gloo_timers::future::TimeoutFuture::new(HERO_AUTO_CYCLE_MS).await;
 
-                // Skip cycling if details are open or paused
-                if details_open() || paused() {
+                // If version changed during wait (manual nav or details toggled), restart timer
+                if cycle_version() != version_at_start {
+                    continue;
+                }
+
+                // Skip cycling if details are open, paused, transitioning, or temporarily paused from manual nav
+                if details_open() || paused() || pause_auto_cycle() || is_transitioning() {
                     continue;
                 }
 
@@ -110,12 +209,18 @@ fn App() -> Element {
                     continue;
                 }
 
-                // Start transition (slide out to left)
+                // Calculate next index and start transition
+                let next = (current_index() + 1) % total;
+                transition_direction.set(Direction::Forward);
+                next_index.set(Some(next));
                 is_transitioning.set(true);
+
+                // Wait for transition animation
                 gloo_timers::future::TimeoutFuture::new(HERO_TRANSITION_MS).await;
 
-                // Switch mnemon
-                current_index.with_mut(|idx| *idx = (*idx + 1) % total);
+                // Switch to next mnemon
+                current_index.set(next);
+                next_index.set(None);
 
                 // End transition
                 gloo_timers::future::TimeoutFuture::new(HERO_TRANSITION_SETTLE_MS).await;
@@ -132,20 +237,65 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
 
-        // Global key handler for debug pause
-        div {
-
         div {
             class: "h-screen w-screen overflow-hidden bg-gray-900",
 
             // Show loading state until IndexedDB data is loaded
             if is_loaded && has_mnemons {
-                if let Some(mnemon_with_work) = current_mnemon_with_work() {
+                // Positioning container for overlapping Heroes during transitions
+                div {
+                    class: "relative h-full w-full overflow-hidden",
+
+                    // During transition, render both current and next mnemon
+                    if is_transitioning() && next_mnemon_with_work().is_some() {
+                        // Render current mnemon (exiting) - lower z-index
+                        if let Some(mnemon_with_work) = current_mnemon_with_work() {
+                            div {
+                                class: "absolute inset-0 z-10",
+                                Hero {
+                                    key: "{mnemon_with_work.mnemon.id}-current",
+                                    mnemon_with_work: mnemon_with_work.clone(),
+                                    is_transitioning: true,
+                                    transition_direction: transition_direction(),
+                                    is_exiting: true,
+                                    details_open: details_open(),
+                                    is_mobile: is_mobile(),
+                                    on_add_click: move |_| {},
+                                    on_details_toggle: move |_| {},
+                                    on_edit: move |_| {},
+                                    on_delete: move |_| {},
+                                }
+                            }
+                        }
+                        // Render next mnemon (entering) - higher z-index
+                        if let Some(mnemon_with_work) = next_mnemon_with_work() {
+                            div {
+                                class: "absolute inset-0 z-20",
+                                Hero {
+                                    key: "{mnemon_with_work.mnemon.id}-next",
+                                    mnemon_with_work: mnemon_with_work.clone(),
+                                    is_transitioning: true,
+                                    transition_direction: transition_direction(),
+                                    is_exiting: false,
+                                    details_open: details_open(),
+                                    is_mobile: is_mobile(),
+                                    on_add_click: move |_| {},
+                                    on_details_toggle: move |_| {},
+                                    on_edit: move |_| {},
+                                    on_delete: move |_| {},
+                                }
+                            }
+                        }
+                    } else if let Some(mnemon_with_work) = current_mnemon_with_work() {
+                    // Normal rendering (no transition)
                     Hero {
                         key: "{mnemon_with_work.mnemon.id}",
                         mnemon_with_work: mnemon_with_work.clone(),
-                        is_transitioning: is_transitioning(),
+                        is_transitioning: false,
+                        transition_direction: Direction::Forward,
+                        is_exiting: false,
                         details_open: details_open(),
+                        is_mobile: is_mobile(),
                         on_add_click: move |_| {
                             show_add_flow.set(true);
                         },
@@ -168,8 +318,15 @@ fn App() -> Element {
                                     current_index.set(total - 1);
                                 }
                             }
-                        }
+                        },
+                        on_navigate_prev: move |_| {
+                            navigate(Direction::Backward);
+                        },
+                        on_navigate_next: move |_| {
+                            navigate(Direction::Forward);
+                        },
                     }
+                }
                 }
             } else if is_loaded {
                 EmptyState {
@@ -309,7 +466,6 @@ fn App() -> Element {
                     }
                 }
             }
-        }
         }
     }
 }

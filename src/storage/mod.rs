@@ -23,38 +23,38 @@ const ASSETS_STORE: &str = "assets";
 #[derive(Debug)]
 pub enum StorageError {
     /// Failed to build/open database
-    DatabaseError(String),
+    Database(String),
     /// Failed to serialize data
-    SerializeError(String),
+    Serialize(String),
     /// Failed to deserialize data
-    DeserializeError(String),
+    Deserialize(String),
     /// Transaction failed
-    TransactionError(String),
+    Transaction(String),
     /// Store operation failed
-    StoreError(String),
+    Store(String),
 }
 
 impl std::fmt::Display for StorageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StorageError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-            StorageError::SerializeError(msg) => write!(f, "Serialize error: {}", msg),
-            StorageError::DeserializeError(msg) => write!(f, "Deserialize error: {}", msg),
-            StorageError::TransactionError(msg) => write!(f, "Transaction error: {}", msg),
-            StorageError::StoreError(msg) => write!(f, "Store error: {}", msg),
+            StorageError::Database(msg) => write!(f, "Database error: {}", msg),
+            StorageError::Serialize(msg) => write!(f, "Serialize error: {}", msg),
+            StorageError::Deserialize(msg) => write!(f, "Deserialize error: {}", msg),
+            StorageError::Transaction(msg) => write!(f, "Transaction error: {}", msg),
+            StorageError::Store(msg) => write!(f, "Store error: {}", msg),
         }
     }
 }
 
 impl From<rexie::Error> for StorageError {
     fn from(e: rexie::Error) -> Self {
-        StorageError::DatabaseError(e.to_string())
+        StorageError::Database(e.to_string())
     }
 }
 
 impl From<serde_wasm_bindgen::Error> for StorageError {
     fn from(e: serde_wasm_bindgen::Error) -> Self {
-        StorageError::SerializeError(e.to_string())
+        StorageError::Serialize(e.to_string())
     }
 }
 
@@ -80,22 +80,22 @@ pub async fn save_work(work: &Work) -> StorageResult<()> {
 
     let transaction = db
         .transaction(&[WORKS_STORE], TransactionMode::ReadWrite)
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let store = transaction
         .store(WORKS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let js_value = serde_wasm_bindgen::to_value(work)?;
     store
         .put(&js_value, None)
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     transaction
         .done()
         .await
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     info!("Saved work '{}' to IndexedDB", work.title_en);
     Ok(())
@@ -107,22 +107,22 @@ pub async fn save_mnemon(mnemon: &Mnemon) -> StorageResult<()> {
 
     let transaction = db
         .transaction(&[MNEMONS_STORE], TransactionMode::ReadWrite)
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let store = transaction
         .store(MNEMONS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let js_value = serde_wasm_bindgen::to_value(mnemon)?;
     store
         .put(&js_value, None)
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     transaction
         .done()
         .await
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     info!("Saved mnemon {} to IndexedDB", mnemon.id);
     Ok(())
@@ -134,21 +134,21 @@ pub async fn load_works() -> StorageResult<Vec<Work>> {
 
     let transaction = db
         .transaction(&[WORKS_STORE], TransactionMode::ReadOnly)
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let store = transaction
         .store(WORKS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let js_values = store
         .get_all(None, None)
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let mut works = Vec::new();
     for js_value in js_values {
         let work: Work = serde_wasm_bindgen::from_value(js_value)
-            .map_err(|e| StorageError::DeserializeError(e.to_string()))?;
+            .map_err(|e| StorageError::Deserialize(e.to_string()))?;
         works.push(work);
     }
 
@@ -162,21 +162,21 @@ pub async fn load_mnemons() -> StorageResult<Vec<Mnemon>> {
 
     let transaction = db
         .transaction(&[MNEMONS_STORE], TransactionMode::ReadOnly)
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let store = transaction
         .store(MNEMONS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let js_values = store
         .get_all(None, None)
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let mut mnemons = Vec::new();
     for js_value in js_values {
         let mnemon: Mnemon = serde_wasm_bindgen::from_value(js_value)
-            .map_err(|e| StorageError::DeserializeError(e.to_string()))?;
+            .map_err(|e| StorageError::Deserialize(e.to_string()))?;
         mnemons.push(mnemon);
     }
 
@@ -197,22 +197,22 @@ pub async fn delete_mnemon(mnemon_id: &uuid::Uuid) -> StorageResult<()> {
 
     let transaction = db
         .transaction(&[MNEMONS_STORE], TransactionMode::ReadWrite)
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let store = transaction
         .store(MNEMONS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let js_key = serde_wasm_bindgen::to_value(&mnemon_id.to_string())?;
     store
         .delete(js_key)
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     transaction
         .done()
         .await
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     info!("Deleted mnemon {} from IndexedDB", mnemon_id);
     Ok(())
@@ -252,22 +252,22 @@ pub async fn save_asset(asset: &StoredAsset) -> StorageResult<()> {
 
     let transaction = db
         .transaction(&[ASSETS_STORE], TransactionMode::ReadWrite)
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let store = transaction
         .store(ASSETS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let js_value = serde_wasm_bindgen::to_value(asset)?;
     store
         .put(&js_value, None)
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     transaction
         .done()
         .await
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     info!("Saved asset '{}' to IndexedDB", asset.id);
     Ok(())
@@ -280,22 +280,22 @@ pub async fn load_asset(id: &str) -> StorageResult<Option<StoredAsset>> {
 
     let transaction = db
         .transaction(&[ASSETS_STORE], TransactionMode::ReadOnly)
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let store = transaction
         .store(ASSETS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let js_key = serde_wasm_bindgen::to_value(id)?;
     let result = store
         .get(js_key)
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     match result {
         Some(js_value) => {
             let asset: StoredAsset = serde_wasm_bindgen::from_value(js_value)
-                .map_err(|e| StorageError::DeserializeError(e.to_string()))?;
+                .map_err(|e| StorageError::Deserialize(e.to_string()))?;
             info!("Loaded asset '{}' from IndexedDB", id);
             Ok(Some(asset))
         }
@@ -316,36 +316,36 @@ pub async fn clear_all() -> StorageResult<()> {
             &[WORKS_STORE, MNEMONS_STORE, ASSETS_STORE],
             TransactionMode::ReadWrite,
         )
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     let works_store = transaction
         .store(WORKS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
     works_store
         .clear()
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let mnemons_store = transaction
         .store(MNEMONS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
     mnemons_store
         .clear()
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     let assets_store = transaction
         .store(ASSETS_STORE)
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
     assets_store
         .clear()
         .await
-        .map_err(|e| StorageError::StoreError(e.to_string()))?;
+        .map_err(|e| StorageError::Store(e.to_string()))?;
 
     transaction
         .done()
         .await
-        .map_err(|e| StorageError::TransactionError(e.to_string()))?;
+        .map_err(|e| StorageError::Transaction(e.to_string()))?;
 
     info!("Cleared all IndexedDB storage");
     Ok(())

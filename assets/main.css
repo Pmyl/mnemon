@@ -103,3 +103,64 @@ body {
 #echo > p {
     margin: 20px 0px 0px auto;
 }
+
+/* Ken Burns effect animations - subtle pan/zoom for cover images */
+@keyframes ken-burns-zoom-pan-right {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.15) translate(-5%, 0); }
+}
+
+@keyframes ken-burns-zoom-pan-left {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.15) translate(5%, 0); }
+}
+
+@keyframes ken-burns-zoom-pan-up {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.15) translate(0, -5%); }
+}
+
+@keyframes ken-burns-zoom-pan-down {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.15) translate(0, 5%); }
+}
+
+@keyframes ken-burns-zoom-pan-diagonal-ne {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.15) translate(-4%, -4%); }
+}
+
+@keyframes ken-burns-zoom-pan-diagonal-sw {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.15) translate(4%, 4%); }
+}
+
+.ken-burns-1 {
+  animation: ken-burns-zoom-pan-right 28s ease-out infinite alternate;
+  will-change: transform;
+}
+
+.ken-burns-2 {
+  animation: ken-burns-zoom-pan-left 25s ease-out infinite alternate;
+  will-change: transform;
+}
+
+.ken-burns-3 {
+  animation: ken-burns-zoom-pan-up 30s ease-out infinite alternate;
+  will-change: transform;
+}
+
+.ken-burns-4 {
+  animation: ken-burns-zoom-pan-down 26s ease-out infinite alternate;
+  will-change: transform;
+}
+
+.ken-burns-5 {
+  animation: ken-burns-zoom-pan-diagonal-ne 27s ease-out infinite alternate;
+  will-change: transform;
+}
+
+.ken-burns-6 {
+  animation: ken-burns-zoom-pan-diagonal-sw 29s ease-out infinite alternate;
+  will-change: transform;
+}

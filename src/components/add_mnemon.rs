@@ -28,7 +28,7 @@ pub fn AddMnemonFlow(
 
             // Modal content
             div {
-                class: "bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
+                class: "bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl mx-2 sm:mx-4 md:mx-auto max-h-[90vh] overflow-y-auto",
                 onclick: move |e| e.stop_propagation(),
 
                 if current_step() == 1 {
@@ -183,7 +183,7 @@ fn Step1ManualEntry(
 
     rsx! {
         div {
-            class: "p-8",
+            class: "px-4 py-6 sm:p-8",
 
             // Header with settings button
             div {
@@ -329,12 +329,12 @@ fn Step1ManualEntry(
                                 // Only hide if no new search was triggered and there's no error/status to show
                                 if search_version() == current_version {
                                     // Don't hide if there's an error or status message to display
-                                    let should_keep_visible = match search_status() {
-                                        Some(SearchStatus::NetworkError(_)) => true,
-                                        Some(SearchStatus::ApiError { .. }) => true,
-                                        Some(SearchStatus::ProviderNotConfigured) => true,
-                                        _ => false,
-                                    };
+                                    let should_keep_visible = matches!(
+                                        search_status(),
+                                        Some(SearchStatus::NetworkError(_))
+                                            | Some(SearchStatus::ApiError { .. })
+                                            | Some(SearchStatus::ProviderNotConfigured)
+                                    );
 
                                     if !should_keep_visible {
                                         show_results.set(false);
@@ -556,7 +556,7 @@ fn Step2Personalize(
 
     rsx! {
         div {
-            class: "p-8",
+            class: "px-4 py-6 sm:p-8",
 
             // Header
             div {
