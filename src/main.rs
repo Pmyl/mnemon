@@ -107,13 +107,9 @@ fn App() -> Element {
         all.get(actual_index).cloned()
     };
 
-    let current_mnemon_with_work = use_memo(move || {
-        get_mnemon_by_index(current_index())
-    });
+    let current_mnemon_with_work = use_memo(move || get_mnemon_by_index(current_index()));
 
-    let next_mnemon_with_work = use_memo(move || {
-        next_index().and_then(get_mnemon_by_index)
-    });
+    let next_mnemon_with_work = use_memo(move || next_index().and_then(get_mnemon_by_index));
 
     // Manual navigation function
     let mut navigate = move |direction: Direction| {
