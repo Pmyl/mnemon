@@ -9,7 +9,13 @@ pub fn EditMnemonFlow(
     on_save: EventHandler<MnemonForm>,
     on_cancel: EventHandler<()>,
 ) -> Element {
-    let form = use_signal(|| initial_form);
+    let mut form = use_signal(MnemonForm::default);
+    
+    // Reset form whenever initial_form changes (e.g., when editing a different mnemon
+    // or reopening the modal for the same mnemon after saving)
+    use_effect(use_reactive((&initial_form,), move |(initial_form,)| {
+        form.set(initial_form.clone());
+    }));
 
     rsx! {
         div {
